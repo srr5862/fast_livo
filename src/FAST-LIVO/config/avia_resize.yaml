@@ -21,8 +21,8 @@ cam_cx: 318.908851
 cam_cy: 234.238189
 
 common:
-    lid_topic:  "/livox/lidar"
-    imu_topic:  "/livox/imu"
+    lid_topic:  "/rslidar_points"
+    imu_topic:  "/imu"
 
 preprocess:
     lidar_type: 1 # Livox Avia LiDAR
@@ -41,7 +41,7 @@ mapping:
 camera:
     # img_topic: /usb_cam/image_raw
     # img_topic:  /camera/image_color
-    img_topic: /left_camera/image
+    img_topic: /camera/images_raw
     #xiyuan
     Rcl: [0.00162756,-0.999991,0.00390957,
          -0.0126748,-0.00392989,-0.999912,

@@ -21,8 +21,8 @@ cam_cx: 3.860151866550880e+02
 cam_cy: 2.419130336743440e+02
 
 common:
-    lid_topic:  "/os1_cloud_node1/points"
-    imu_topic:  "/os1_cloud_node1/imu"
+    lid_topic:  "/rslidar_points"
+    imu_topic:  "/imu"
 
 preprocess:
     lidar_type: 3  # Ouster
@@ -39,7 +39,7 @@ mapping:
                    0, 0, 1]
 
 camera:
-    img_topic: /left/image_raw 
+    img_topic: /camera/images_raw
     # NTU_VIRAL
     Rcl: [0.0218308, 0.99976, -0.00201407,
          -0.0131205, 0.00230088, 0.999911,

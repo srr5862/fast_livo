@@ -69,6 +69,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
   pl_surf.clear();
   pl_corn.clear();
   pl_full.clear();
+  // omp_get_wtime 
   double t1 = omp_get_wtime();
   uint plsize = msg->point_num;
   uint effect_ind = 0;

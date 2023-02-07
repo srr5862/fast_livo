@@ -61,9 +61,10 @@ LIST(APPEND SOURCEFILES src/atan_camera.cpp
 
 # Create vikit library
 ADD_LIBRARY(${PROJECT_NAME} SHARED ${SOURCEFILES})
+Set(sophuslib /usr/local/lib/libSophus.so)
 TARGET_LINK_LIBRARIES(${PROJECT_NAME}
   ${OpenCV_LIBS}
-  ${Sophus_LIBRARIES}
+  ${sophuslib}
   ${catkin_LIBRARIES})
 
 IF(USE_ROS)

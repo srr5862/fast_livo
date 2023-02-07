@@ -2,5 +2,13 @@
     "files.associations": {
         "*.tcc": "cpp",
         "vector": "cpp"
-    }
+    },
+    "python.autoComplete.extraPaths": [
+        "/home/srr/projects/fast_livo/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/srr/projects/fast_livo/devel/lib/python3/dist-packages",
+        "/opt/ros/noetic/lib/python3/dist-packages"
+    ]
 }

@@ -1,0 +1,7 @@
+<launch>
+
+    <node pkg="fast_livo" type="global_localization.py" name="global_localization" output="screen">
+
+     </node>
+
+</launch>

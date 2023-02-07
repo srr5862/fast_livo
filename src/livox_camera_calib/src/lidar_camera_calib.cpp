@@ -180,8 +180,8 @@ void roughCalib(Calibration &calibra, Vector6d &calib_params,
                             calibra.rgb_egde_cloud_, calibra.plane_line_cloud_,
                             pnp_list);
           cv::Mat projection_img = calibra.getProjectionImg(calib_params);
-          cv::imshow("Rough Optimization", projection_img);
-          cv::waitKey(50);
+     //     cv::imshow("Rough Optimization", projection_img);
+      //    cv::waitKey(50);
         }
       }
     }
@@ -253,16 +253,16 @@ int main(int argc, char **argv) {
   pub_cloud.header.frame_id = "livox";
   calibra.init_rgb_cloud_pub_.publish(pub_cloud);
   cv::Mat init_img = calibra.getProjectionImg(calib_params);
-  cv::imshow("Initial extrinsic", init_img);
-  cv::imwrite("/home/ycj/data/calib/init.png", init_img);
+//  cv::imshow("Initial extrinsic", init_img);
+  cv::imwrite("/home/srr/data/calib/result/init.png", init_img);
   cv::waitKey(1000);
 
   if (use_rough_calib) {
     roughCalib(calibra, calib_params, DEG2RAD(0.1), 50);
   }
   cv::Mat test_img = calibra.getProjectionImg(calib_params);
-  cv::imshow("After rough extrinsic", test_img);
-  cv::waitKey(1000);
+ // cv::imshow("After rough extrinsic", test_img);
+  //cv::waitKey(1000);
   int iter = 0;
   // Maximum match distance threshold: 15 pixels
   // If initial extrinsic lead to error over 15 pixels, the algorithm will not
@@ -271,7 +271,7 @@ int main(int argc, char **argv) {
   bool opt_flag = true;
 
   // Iteratively reducve the matching distance threshold
-  for (dis_threshold = 30; dis_threshold > 10; dis_threshold -= 1) {
+  for (dis_threshold = 100; dis_threshold > 10; dis_threshold -= 1) {
     // For each distance, do twice optimization
     for (int cnt = 0; cnt < 2; cnt++) {
       if (use_vpnp) {
@@ -380,8 +380,8 @@ int main(int argc, char **argv) {
   }
   outfile << 0 << "," << 0 << "," << 0 << "," << 1 << std::endl;
   cv::Mat opt_img = calibra.getProjectionImg(calib_params);
-  cv::imshow("Optimization result", opt_img);
-  cv::imwrite("/home/ycj/data/calib/opt.png", opt_img);
+  //cv::imshow("Optimization result", opt_img);
+  cv::imwrite("/home/srr/data/calib/result/opt.png", opt_img);
   cv::waitKey(1000);
   Eigen::Matrix3d init_rotation;
   init_rotation << 0, -1.0, 0, 0, 0, -1.0, 1, 0, 0;

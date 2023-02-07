@@ -1,6 +1,6 @@
 # Data path. adjust them!
 common:
-    image_file: "/home/srr/data/calib/image/0.jpg"
+    image_file: "/home/srr/data/calib/image/53.jpg"
     pcd_file: "/home/srr/data/calib/pcd/test.pcd"
     result_file: "/home/srr/data/calib/extrinsic.txt"
 
@@ -13,5 +13,5 @@ camera:
 
 # Calibration Parameters.!
 calib:
-    calib_config_file: "/home/srr/projects/livox_camera_calibration/src/livox_camera_calib/config/config_outdoor.yaml"
+    calib_config_file: "/home/srr/projects/fast_livo/src/livox_camera_calib/config/config_outdoor.yaml"
     use_rough_calib: true # set true if your initial_extrinsic is bad

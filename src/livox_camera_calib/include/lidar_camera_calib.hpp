@@ -53,8 +53,8 @@ public:
 
   int rgb_edge_minLen_ = 200;
   int rgb_canny_threshold_ = 20;
-  int min_depth_ = 2.5;
-  int max_depth_ = 50;
+  int min_depth_ = 0.1;
+  int max_depth_ = 5;
   int plane_max_size_ = 5;
   float detect_line_threshold_ = 0.02;
   int line_number_ = 0;
@@ -295,7 +295,7 @@ void Calibration::colorCloud(
   for (size_t i = 0; i < lidar_cloud->size(); i += density) {
     pcl::PointXYZI point = lidar_cloud->points[i];
     float depth = sqrt(pow(point.x, 2) + pow(point.y, 2) + pow(point.z, 2));
-    if (depth > 2 && depth < 50 &&
+    if (depth > 0.1 && depth < 5 &&
         point.intensity >= color_intensity_threshold_) {
       pts_3d.emplace_back(cv::Point3f(point.x, point.y, point.z));
     }

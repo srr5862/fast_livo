@@ -111,6 +111,8 @@ add_executable(fastlivo_mapping src/laserMapping.cpp
                                 src/IMU_Processing.cpp
                                 src/preprocess.cpp
                                 )
+add_executable(point2customMsg src/point2customMsg.cpp)
+target_link_libraries(point2customMsg ${catkin_LIBRARIES} ${PCL_LIBRARIES})                              
 target_link_libraries(fastlivo_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} vio ikdtree)
 target_include_directories(fastlivo_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 

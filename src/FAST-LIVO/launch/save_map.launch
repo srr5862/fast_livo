@@ -1,0 +1,5 @@
+<launch>
+
+    <node pkg="fast_livo" type="save_map" name="save_map"></node>
+
+</launch>

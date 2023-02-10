@@ -4,7 +4,7 @@
 #define RETURN0AND1 0x10
 
 Preprocess::Preprocess()
-  :feature_enabled(0), lidar_type(AVIA), blind(0.01), point_filter_num(1)
+  :feature_enabled(1), lidar_type(AVIA), blind(0.01), point_filter_num(1)
 {
   inf_bound = 10;
   N_SCANS   = 6;
@@ -72,7 +72,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
   double t1 = omp_get_wtime();
   uint plsize = msg->point_num;
   uint effect_ind = 0;
-
+  int max_dist = 15;
   pl_corn.reserve(plsize);
   pl_surf.reserve(plsize);
   pl_full.resize(plsize);
@@ -92,6 +92,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
             || (abs(msg->points[i].z - msg->points[i-1].z) < 1e-8)
             || (msg->points[i].x * msg->points[i].x + msg->points[i].y * msg->points[i].y < blind)
             || (msg->points[i].line > N_SCANS)
+            || (msg->points[i].x > max_dist)
             || ((msg->points[i].tag & 0x30) != RETURN0AND1))
         {
             continue;
@@ -129,6 +130,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
   }
   else
   {
+
     for(uint i=1; i<plsize; i++)
     {
         if((abs(msg->points[i].x - msg->points[i-1].x) < 1e-8) 
@@ -136,6 +138,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
             || (abs(msg->points[i].z - msg->points[i-1].z) < 1e-8)
             || (msg->points[i].x * msg->points[i].x + msg->points[i].y * msg->points[i].y < blind)
             || (msg->points[i].line > N_SCANS)
+            || (msg->points[i].x > max_dist)
             || ((msg->points[i].tag & 0x30) != RETURN0AND1))
         {
             continue;

@@ -110,7 +110,9 @@ add_library(vio src/lidar_selection.cpp
 add_executable(fastlivo_mapping src/laserMapping.cpp 
                                 src/IMU_Processing.cpp
                                 src/preprocess.cpp
-                                )                             
+                                ) 
+add_executable(save_map src/save_map.cpp)
+target_link_libraries(save_map ${catkin_LIBRARIES} ${PCL_LIBRARIES})                            
 target_link_libraries(fastlivo_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} vio ikdtree)
 target_include_directories(fastlivo_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 

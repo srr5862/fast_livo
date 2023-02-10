@@ -43,6 +43,7 @@
 #include <so3_math.h>
 #include <ros/ros.h>
 #include <Eigen/Core>
+
 // #include <common_lib.h>
 #include <image_transport/image_transport.h>
 #include "IMU_Processing.h"
@@ -162,6 +163,8 @@ PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
 PointCloudXYZI::Ptr cube_points_add(new PointCloudXYZI());
 PointCloudXYZI::Ptr map_cur_frame_point(new PointCloudXYZI());
 PointCloudXYZI::Ptr sub_map_cur_frame_point(new PointCloudXYZI());
+PointCloudXYZI::Ptr cloud( new PointCloudXYZI());
+
 
 PointCloudXYZI::Ptr feats_undistort(new PointCloudXYZI());
 PointCloudXYZI::Ptr feats_down_body(new PointCloudXYZI());
@@ -208,6 +211,7 @@ nav_msgs::Path path;
 nav_msgs::Odometry odomAftMapped;
 geometry_msgs::Quaternion geoQuat;
 geometry_msgs::PoseStamped msg_body_pose;
+
 
 shared_ptr<Preprocess> p_pre(new Preprocess());
 
@@ -890,6 +894,12 @@ void publish_map(const ros::Publisher & pubLaserCloudMap)
     pubLaserCloudMap.publish(laserCloudMap);
 }
 
+
+
+
+
+
+
 template<typename T>
 void set_posestamp(T & out)
 {
@@ -1390,7 +1400,7 @@ int main(int argc, char** argv)
                 publish_visual_world_sub_map(pubSubVisualCloud);
                 
                 // *map_cur_frame_point = *pcl_wait_pub;
-                // mtx_buffer_pointcloud.unlock();
+                // mtx_buffer_pointcloud.unlock();cloud_registered
                 // lidar_selector->detect(LidarMeasures.measures.back().img, feats_down_world);
                 // p_imu->push_update_state(LidarMeasures.measures.back().img_offset_time, state);
                 geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
@@ -1473,6 +1483,7 @@ int main(int argc, char** argv)
             ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
             featsFromMap->clear();
             featsFromMap->points = ikdtree.PCL_Storage;
+            cout << "num:" << featsFromMap->size() << endl;
         }
     #else
         kdtreeSurfFromMap->setInputCloud(featsFromMap);
@@ -1770,11 +1781,11 @@ int main(int argc, char** argv)
                                 &laserCloudWorld->points[i]);
         }
         *pcl_wait_pub = *laserCloudWorld;
-
+        
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_effect_world(pubLaserCloudEffect);
-        // publish_map(pubLaserCloudMap);
+        publish_map(pubLaserCloudMap);
         publish_path(pubPath);
         #ifdef DEPLOY
         publish_mavros(mavros_pose_publisher);
@@ -1819,19 +1830,20 @@ int main(int argc, char** argv)
     //--------------------------save map---------------
     // string surf_filename(map_file_path + "/surf.pcd");
     // string corner_filename(map_file_path + "/corner.pcd");
-    // string all_points_filename(map_file_path + "/all_points.pcd");
+    // // string all_points_filename(map_file_path + "/all_points.pcd");
 
-    // PointCloudXYZI surf_points, corner_points;
-    // surf_points = *featsFromMap;
-    // fout_out.close();
-    // fout_pre.close();
-    // if (surf_points.size() > 0 && corner_points.size() > 0) 
-    // {
-    // pcl::PCDWriter pcd_writer;
-    // cout << "saving...";
-    // pcd_writer.writeBinary(surf_filename, surf_points);
-    // pcd_writer.writeBinary(corner_filename, corner_points);
-    // }
+    PointCloudXYZI surf_points, corner_points;
+    surf_points = *featsFromMap;
+    fout_out.close();
+    fout_pre.close();
+    cout  << "surf_size:" <<surf_points.size() << endl;
+    if (surf_points.size() > 0 ) 
+    {
+        pcl::PCDWriter pcd_writer;
+        cout << "saving...";
+        pcd_writer.writeBinary("/home/srr/surf.pcd", surf_points);
+        // pcd_writer.writeBinary(corner_filename, corner_points);
+    }
 
     #ifndef DEPLOY
     vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    

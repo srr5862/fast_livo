@@ -22,7 +22,6 @@ Preprocess::Preprocess()
   edgeb = 0.1;
   smallp_intersect = 172.5;
   smallp_ratio = 1.2;
-
   jump_up_limit = cos(jump_up_limit/180*M_PI);
   jump_down_limit = cos(jump_down_limit/180*M_PI);
   cos160 = cos(cos160/180*M_PI);
@@ -83,7 +82,7 @@ void Preprocess::avia_handler(const livox_ros_driver2::CustomMsg::ConstPtr &msg)
     pl_buff[i].clear();
     pl_buff[i].reserve(plsize);
   }
-
+  int max_x = 10;
   if (feature_enabled)
   {
     for(uint i=1; i<plsize; i++)

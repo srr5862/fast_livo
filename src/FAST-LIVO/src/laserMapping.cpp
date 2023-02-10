@@ -142,6 +142,7 @@ vector<BoxPointType> cub_needad;
 deque<PointCloudXYZI::Ptr>  lidar_buffer;
 deque<double>          time_buffer;
 deque<sensor_msgs::Imu::ConstPtr> imu_buffer;
+cv::Mat test_img;
 deque<cv::Mat> img_buffer;
 deque<double>          img_time_buffer;
 vector<bool> point_selected_surf; 
@@ -154,6 +155,7 @@ vector<double> cameraextrinT(3, 0.0);
 vector<double> cameraextrinR(9, 0.0);
 double total_residual;
 double LASER_POINT_COV, IMG_POINT_COV, cam_fx, cam_fy, cam_cx, cam_cy; 
+double cam_d0,cam_d1,cam_d2,cam_d3;
 bool flg_EKF_inited, flg_EKF_converged, EKF_stop_flg = 0;
 //surf feature in map
 PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
@@ -187,6 +189,9 @@ V3D euler_cur;
 V3D position_last(Zero3d);
 Eigen::Matrix3d Rcl;
 Eigen::Vector3d Pcl;
+Eigen::Vector4d Dist;
+Eigen::Vector3d cam_K;
+Eigen::Vector3d I;
 
 //estimator inputs and output;
 LidarMeasureGroup LidarMeasures;
@@ -411,6 +416,7 @@ void lasermap_fov_segment()
 }
 #endif
 
+
 void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
 {
     mtx_buffer.lock();
@@ -503,6 +509,7 @@ void img_cbk(const sensor_msgs::ImageConstPtr& msg)
     mtx_buffer.lock();
     // cout<<"Lidar_buff.size()"<<lidar_buffer.size()<<endl;
     // cout<<"Imu_buffer.size()"<<imu_buffer.size()<<endl;
+
     img_buffer.push_back(getImageFromMsg(msg));
     img_time_buffer.push_back(msg->header.stamp.toSec());
     last_timestamp_img = msg->header.stamp.toSec();
@@ -1096,6 +1103,10 @@ void readParameters(ros::NodeHandle &nh)
     nh.param<double>("cam_fy",cam_fy,453.254913);
     nh.param<double>("cam_cx",cam_cx,318.908851);
     nh.param<double>("cam_cy",cam_cy,234.238189);
+    nh.param<double>("cam_d0",cam_d0,-0.16295214119433765);
+    nh.param<double>("cam_d1",cam_d1, 0.07877474167395242);
+    nh.param<double>("cam_d2",cam_d2,-0.0012159011740823368);
+    nh.param<double>("cam_d3",cam_d3,-0.0002286961458256605);
     nh.param<double>("laser_point_cov",LASER_POINT_COV,0.001);
     nh.param<double>("img_point_cov",IMG_POINT_COV,10);
     nh.param<string>("map_file_path",map_file_path,"");

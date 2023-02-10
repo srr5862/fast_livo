@@ -1,8 +1,11 @@
 # Data path. adjust them!
 common:
-    image_file: "/home/srr/data/calib/image/53.jpg"
-    pcd_file: "/home/srr/data/calib/pcd/test.pcd"
-    result_file: "/home/srr/data/calib/extrinsic.txt"
+    image_file: "/home/srr/data/calib/images1/322.jpg"
+    # image_file: "/home/srr/data/calib/images/53.jpg"
+    pcd_file: "/home/srr/data/calib/pcd/test_new.pcd"
+    result_file: "/home/srr/data/calib/extrinsic_new.txt"
+    # pcd_file: "/home/srr/data/calib/pcd/test.pcd"
+    # result_file: "/home/srr/data/calib/extrinsic_new1.txt"
 
 # Camera Parameters. Adjust them!
 camera:

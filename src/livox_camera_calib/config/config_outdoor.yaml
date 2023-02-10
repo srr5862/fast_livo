@@ -2,7 +2,7 @@
 
 # Topic name in rosbag
 PointCloudTopic: "/livox/lidar"
-ImageTopic: "/images"
+ImageTopic: "/image"
 
 # Lidar Data type(custom msg or pointcloud2)
 Data.custom_msg: 0
@@ -12,14 +12,14 @@ ExtrinsicMat: !!opencv-matrix
   rows: 4
   cols: 4
   dt: d
-  data: [0.0,   0.0,   -1.0,    0.30452,
-         0.0,  -1.0,  0.0,    0.0,
-         1.0,   0.0,    0.0,    -0.0502734,
+  data: [0.0,   0.0,   -1.0,    0.405134,
+         0.0,  -1.0,  0.0,    -1.66495 ,
+         1.0,   0.0,    0.0,    0.5,
          0.0,   0.0,    0.0,    1.0]
 # Params for Canny Edge Extraction
 
 Canny.gray_threshold: 10
-Canny.len_threshold: 70
+Canny.len_threshold: 70 
 
 # Params for Voxel Cutting & Plane Fitting & Edge Extraction
 Voxel.size: 0.5

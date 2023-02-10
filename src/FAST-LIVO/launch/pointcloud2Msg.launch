@@ -1,9 +1,0 @@
-<launch>
-
-    <node pkg="fast_livo" type="point2customMsg" name="point2customMsg" output="screen">
-
-    
-    </node>
-
-
-</launch>

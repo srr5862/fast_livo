@@ -45,6 +45,7 @@
 #include <Eigen/Core>
 
 // #include <common_lib.h>
+#include "fast_livo/save_map.h"
 #include <image_transport/image_transport.h>
 #include "IMU_Processing.h"
 #include <nav_msgs/Odometry.h>
@@ -164,7 +165,7 @@ PointCloudXYZI::Ptr cube_points_add(new PointCloudXYZI());
 PointCloudXYZI::Ptr map_cur_frame_point(new PointCloudXYZI());
 PointCloudXYZI::Ptr sub_map_cur_frame_point(new PointCloudXYZI());
 PointCloudXYZI::Ptr cloud( new PointCloudXYZI());
-
+PointCloudXYZI::Ptr  tmp(new PointCloudXYZI());
 
 PointCloudXYZI::Ptr feats_undistort(new PointCloudXYZI());
 PointCloudXYZI::Ptr feats_down_body(new PointCloudXYZI());
@@ -175,6 +176,7 @@ PointCloudXYZI::Ptr corr_normvect(new PointCloudXYZI());
 
 pcl::VoxelGrid<PointType> downSizeFilterSurf;
 pcl::VoxelGrid<PointType> downSizeFilterMap;
+pcl::VoxelGrid<PointType> downSizeFilterGlobalMap;
 
 #ifdef USE_ikdtree
     #ifdef USE_ikdforest
@@ -420,6 +422,35 @@ void lasermap_fov_segment()
 }
 #endif
 
+bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& res){
+    // string saveMapFileName;
+    // if(req.destination.empty()) saveMapFileName = std::getenv("HOME") + saveMapFileName;
+    // else    saveMapFileName = std::getenv("HOME") + req.destination;
+    cout << "save map" << endl;
+    // featsFromMap
+    if(req.resolution != 0){
+        cout << "save resolution" << req.resolution << endl;
+        downSizeFilterGlobalMap.setInputCloud(tmp);
+        downSizeFilterGlobalMap.setLeafSize(req.resolution,req.resolution,req.resolution);
+        downSizeFilterGlobalMap.filter(*cloud);
+    }else{
+        cout << "save resolution 0" << endl;
+        cout << tmp->size()<<endl;
+        downSizeFilterGlobalMap.setInputCloud(tmp);
+        downSizeFilterGlobalMap.filter(*cloud);
+    }
+     pcl::io::savePCDFileBinary("/home/srr/test1.pcd",*cloud);
+    return true;
+}
+
+void saveGlobalMap(){
+    fast_livo::save_map::Request req;
+    fast_livo::save_map::Response  res;
+    if(!map_cbk(req,res)){
+        cout << "failed to save" <<endl;
+    }
+
+}
 
 void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
 {
@@ -1161,8 +1192,9 @@ int main(int argc, char** argv)
         nh.subscribe(lid_topic, 200000, standard_pcl_cbk);
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 200000, imu_cbk);
     ros::Subscriber sub_img = nh.subscribe(img_topic, 200000, img_cbk);
+    ros::ServiceServer map_server = nh.advertiseService("/save_map",map_cbk);
     image_transport::Publisher img_pub = it.advertise("/rgb_img", 1);
-    ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>
+    ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::    PointCloud2>
             ("/cloud_registered", 100);
     ros::Publisher pubLaserCloudFullResRgb = nh.advertise<sensor_msgs::PointCloud2>
             ("/cloud_registered_rgb", 100);
@@ -1439,6 +1471,11 @@ int main(int argc, char** argv)
             }
             continue;
         }
+        PointVector().swap(ikdtree.PCL_Storage);
+        ikdtree.flatten(ikdtree.Root_Node,ikdtree.PCL_Storage,NOT_RECORD);
+        tmp->points = ikdtree.PCL_Storage;
+        cout << "success" <<endl;
+        cout << tmp->points.size() << endl;
         int featsFromMapNum = ikdtree.size();
         #endif
     #else
@@ -1832,18 +1869,18 @@ int main(int argc, char** argv)
     // string corner_filename(map_file_path + "/corner.pcd");
     // // string all_points_filename(map_file_path + "/all_points.pcd");
 
-    PointCloudXYZI surf_points, corner_points;
-    surf_points = *featsFromMap;
-    fout_out.close();
-    fout_pre.close();
-    cout  << "surf_size:" <<surf_points.size() << endl;
-    if (surf_points.size() > 0 ) 
-    {
-        pcl::PCDWriter pcd_writer;
-        cout << "saving...";
-        pcd_writer.writeBinary("/home/srr/surf.pcd", surf_points);
-        // pcd_writer.writeBinary(corner_filename, corner_points);
-    }
+    // PointCloudXYZI surf_points, corner_points;
+    // surf_points = *featsFromMap;
+    // fout_out.close();
+    // fout_pre.close();
+    // cout  << "surf_size:" <<surf_points.size() << endl;
+    // if (surf_points.size() > 0 ) 
+    // {
+    //     pcl::PCDWriter pcd_writer;
+    //     cout << "saving...";
+    //     pcd_writer.writeBinary("/home/srr/surf.pcd", surf_points);
+    //     // pcd_writer.writeBinary(corner_filename, corner_points);
+    // }
 
     #ifndef DEPLOY
     vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    

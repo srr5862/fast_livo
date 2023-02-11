@@ -85,12 +85,19 @@ add_message_files(
   States.msg
 )
 
+add_service_files(
+  FILES
+  save_map.srv
+)
+
 generate_messages(
  DEPENDENCIES
  geometry_msgs
 )
 
-catkin_package(
+
+
+catkin_package( 
   CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime cv_bridge image_transport vikit_common vikit_ros
   DEPENDS EIGEN3 PCL OpenCV Sophus
   INCLUDE_DIRS include
@@ -111,8 +118,6 @@ add_executable(fastlivo_mapping src/laserMapping.cpp
                                 src/IMU_Processing.cpp
                                 src/preprocess.cpp
                                 ) 
-add_executable(save_map src/save_map.cpp)
-target_link_libraries(save_map ${catkin_LIBRARIES} ${PCL_LIBRARIES})                            
 target_link_libraries(fastlivo_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} vio ikdtree)
 target_include_directories(fastlivo_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
 

@@ -47,6 +47,8 @@ using namespace Sophus;
 #define DEBUG_FILE_DIR(name)     (string(string(ROOT_DIR) + "Log/"+ name))
 
 typedef fast_livo::Pose6D Pose6D;
+typedef pcl::PointXYZ PointOwnType;
+typedef pcl::PointCloud<PointOwnType> PointCloudXYZ;
 typedef pcl::PointXYZINormal PointType;
 typedef pcl::PointXYZRGB PointTypeRGB;
 typedef pcl::PointCloud<PointType> PointCloudXYZI;

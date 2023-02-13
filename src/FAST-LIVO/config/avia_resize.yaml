@@ -2,40 +2,41 @@ feature_extract_enable : 1
 #update 2->3->4
 point_filter_num : 4
 max_iteration : 10
-dense_map_enable : 1
+dense_map_enable : 0
 #0.5 -> 0.08->0.0.5
 filter_size_surf : 0.08
 #0.4 -> 0.20->0.15
-filter_size_map : 0.20
+filter_size_map : 0.5
 cube_side_length : 20
 debug : 0
 grid_size : 40
-patch_size : 16
-img_enable : 1
+patch_size : 4
+img_enable : 0
 lidar_enable : 1
 outlier_threshold : 300 # 78 100 156
 ncc_en: true
 ncc_thre: 1
+resolution: 0.05
 #import
 
-img_point_cov : 1500 # 1000
+img_point_cov : 1000 # 1000
 laser_point_cov : 0.001 # 0.001
-cam_fx: 447.5147576292463
-cam_fy: 447.7186850105169
-cam_cx: 297.34290828535893
-cam_cy: 263.33217568440745
-cam_d0: -0.16295214119433765
-cam_d1: 0.07877474167395242
-cam_d2: -0.0012159011740823368
-cam_d3: -0.0002286961458256605
-# cam_fx: 907.2279243644371
-# cam_fy: 907.5567393416758
-# cam_cx: 599.2463987954802
-# cam_cy: 521.7126272813557
-# cam_d0: -0.1779536910815181
-# cam_d1: 0.11230081170699428
-# cam_d2: -0.000414365689274243
-# cam_d3: 9.025272569088937e-05
+# cam_fx: 447.5147576292463
+# cam_fy: 447.7186850105169
+# cam_cx: 297.34290828535893
+# cam_cy: 263.33217568440745
+# cam_d0: -0.16295214119433765
+# cam_d1: 0.07877474167395242
+# cam_d2: -0.0012159011740823368
+# cam_d3: -0.0002286961458256605
+cam_fx: 907.2279243644371
+cam_fy: 907.5567393416758
+cam_cx: 599.2463987954802
+cam_cy: 521.7126272813557
+cam_d0: -0.1779536910815181
+cam_d1: 0.11230081170699428
+cam_d2: -0.000414365689274243
+cam_d3: 9.025272569088937e-05
 
 
 
@@ -46,7 +47,7 @@ common:
 
 preprocess:
     lidar_type: 1 # Livox Avia LiDAR
-    scan_line: 3
+    scan_line: 6
     blind: 3 # blind x m disable
 
 mapping:

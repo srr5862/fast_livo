@@ -4,7 +4,7 @@ namespace lidar_selection {
 
 LidarSelector::LidarSelector(const int gridsize, SparseMap* sparsemap ): grid_size(gridsize), sparse_map(sparsemap)
 {
-    downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
+    downSizeFilter.setLeafSize(0.5, 0.5, 0.5);
     G = Matrix<double, DIM_STATE, DIM_STATE>::Zero();
     H_T_H = Matrix<double, DIM_STATE, DIM_STATE>::Zero();
     Rli = M3D::Identity();

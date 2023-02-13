@@ -108,7 +108,7 @@ Vector3d Lidar_offset_to_IMU;
 int iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0,\
     effct_feat_num = 0, time_log_counter = 0, publish_count = 0;
 int MIN_IMG_COUNT = 0;
-
+double resolution = 0.5;
 double res_mean_last = 0.05;
 //double gyr_cov_scale, acc_cov_scale;
 double gyr_cov_scale = 0, acc_cov_scale = 0;
@@ -422,35 +422,21 @@ void lasermap_fov_segment()
 }
 #endif
 
-bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& res){
-    // string saveMapFileName;
-    // if(req.destination.empty()) saveMapFileName = std::getenv("HOME") + saveMapFileName;
-    // else    saveMapFileName = std::getenv("HOME") + req.destination;
-    cout << "save map" << endl;
-    // featsFromMap
-    if(req.resolution != 0){
-        cout << "save resolution" << req.resolution << endl;
-        downSizeFilterGlobalMap.setInputCloud(tmp);
-        downSizeFilterGlobalMap.setLeafSize(req.resolution,req.resolution,req.resolution);
-        downSizeFilterGlobalMap.filter(*cloud);
-    }else{
-        cout << "save resolution 0" << endl;
-        cout << tmp->size()<<endl;
-        downSizeFilterGlobalMap.setInputCloud(tmp);
-        downSizeFilterGlobalMap.filter(*cloud);
-    }
-     pcl::io::savePCDFileBinary("/home/srr/test1.pcd",*cloud);
-    return true;
-}
+// void getDownSizeMapPoints(const sensor_msgs::PointCloud2::Ptr &msg){
+//     cout << "get msg" << endl;
 
-void saveGlobalMap(){
-    fast_livo::save_map::Request req;
-    fast_livo::save_map::Response  res;
-    if(!map_cbk(req,res)){
-        cout << "failed to save" <<endl;
-    }
+//     PointCloudXYZI::Ptr msgPointsFiltered(new PointCloudXYZI());
+//     PointCloudXYZI::Ptr msgPoints(new PointCloudXYZI());
+//     pcl::fromROSMsg(*msg,*msgPoints);
+//     downSizeFilterGlobalMap.setInputCloud(msgPoints);
+//     downSizeFilterGlobalMap.setLeafSize(0.05f,0.05f,0.05f);
+//     downSizeFilterGlobalMap.filter(*msgPointsFiltered);
 
-}
+//     *cloud += *msgPointsFiltered;
+//     cout << "global map size" <<cloud->points.size() << endl;
+// } 
+
+
 
 void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
 {
@@ -1129,7 +1115,26 @@ void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_
     solve_time += omp_get_wtime() - solve_start_;
     //return meas_vec;
 }
-#endif         
+#endif
+
+bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& res){
+    cout << "save map" << endl;
+    PointCloudXYZ::Ptr pxyz(new PointCloudXYZ());
+    int cloud_size = cloud->points.size();
+    downSizeFilterGlobalMap.setInputCloud(cloud);
+    downSizeFilterGlobalMap.setLeafSize(resolution,resolution,resolution);
+    downSizeFilterGlobalMap.filter(*cloud);
+    for(int i = 0 ; i < cloud_size; i++){
+        pcl::PointXYZ xyz;
+        xyz.x = cloud->points[i].x;
+        xyz.y = cloud->points[i].y;
+        xyz.z = cloud->points[i].z;
+        pxyz->push_back(xyz);
+    }
+    cout << "map finish" <<endl;
+    pcl::io::savePCDFileBinary("/home/srr/test_1.pcd",*pxyz);
+    return true;
+}
 
 void readParameters(ros::NodeHandle &nh)
 {
@@ -1174,6 +1179,7 @@ void readParameters(ros::NodeHandle &nh)
     nh.param<int>("patch_size", patch_size, 4);
     nh.param<double>("outlier_threshold",outlier_threshold,100);
     nh.param<double>("ncc_thre", ncc_thre, 100);
+    nh.param<double>("resolution",resolution,0.5);
 }
 
 int main(int argc, char** argv)
@@ -1210,6 +1216,7 @@ int main(int argc, char** argv)
             ("/aft_mapped_to_init", 10);
     ros::Publisher pubPath          = nh.advertise<nav_msgs::Path> 
             ("/path", 10);
+    // ros::Subscriber subMapPoints = nh.subscribe("/cloud_registered",100,getDownSizeMapPoints);
 
 #ifdef DEPLOY
     ros::Publisher mavros_pose_publisher = nh.advertise<geometry_msgs::PoseStamped>("/mavros/vision_pose/pose", 10);
@@ -1449,6 +1456,7 @@ int main(int argc, char** argv)
             lasermap_fov_segment();
         #endif
         /*** downsample the feature points in a scan ***/
+        cout << "down!!!!!!!!!!!!!!!!!!!!!!!!!!!"<< endl;
         downSizeFilterSurf.setInputCloud(feats_undistort);
         downSizeFilterSurf.filter(*feats_down_body);
     #ifdef USE_ikdtree
@@ -1471,12 +1479,14 @@ int main(int argc, char** argv)
             }
             continue;
         }
-        PointVector().swap(ikdtree.PCL_Storage);
-        ikdtree.flatten(ikdtree.Root_Node,ikdtree.PCL_Storage,NOT_RECORD);
-        tmp->points = ikdtree.PCL_Storage;
-        cout << "success" <<endl;
-        cout << tmp->points.size() << endl;
+        // PointVector().swap(ikdtree.PCL_Storage);
+        // ikdtree.flatten(ikdtree.Root_Node,ikdtree.PCL_Storage,NOT_RECORD);
+        // tmp->points = ikdtree.PCL_Storage;
         int featsFromMapNum = ikdtree.size();
+        // downSizeFilterMap.setInputCloud(featsFromMap);
+        // downSizeFilterMap.setLeafSize(resolution,resolution,resolution);
+        // downSizeFilterMap.filter(*featsFromMap);
+        // cout << "after down size is :" <<featsFromMap->size() << endl;
         #endif
     #else
         if(featsFromMap->points.empty())
@@ -1514,13 +1524,18 @@ int main(int argc, char** argv)
         }
 
     #ifdef USE_ikdtree
-        if(0)
+        if(1)
         {
+            cout << "----------------------------------" << endl;
             PointVector ().swap(ikdtree.PCL_Storage);
             ikdtree.flatten(ikdtree.Root_Node, ikdtree.PCL_Storage, NOT_RECORD);
             featsFromMap->clear();
             featsFromMap->points = ikdtree.PCL_Storage;
-            cout << "num:" << featsFromMap->size() << endl;
+            // downSizeFilterGlobalMap.setInputCloud(featsFromMap);
+            // downSizeFilterGlobalMap.filter(*featsFromMap);
+            // *cloud += *featsFromMap;    
+            // cout << "num:" << featsFromMap->size() << endl;
+            // cout << "cloud size :" << cloud->size() <<endl;
         }
     #else
         kdtreeSurfFromMap->setInputCloud(featsFromMap);
@@ -1818,7 +1833,9 @@ int main(int argc, char** argv)
                                 &laserCloudWorld->points[i]);
         }
         *pcl_wait_pub = *laserCloudWorld;
+        cout << "===================" <<  laserCloudWorld->size() << endl;
         
+        *cloud += *laserCloudWorld;
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_effect_world(pubLaserCloudEffect);
@@ -1827,6 +1844,9 @@ int main(int argc, char** argv)
         #ifdef DEPLOY
         publish_mavros(mavros_pose_publisher);
         #endif
+
+
+
 
         /*** Debug variables ***/
         frame_num ++;
@@ -1862,6 +1882,7 @@ int main(int argc, char** argv)
             <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
             #endif
         }
+        // saveGlobalMap();
         // dump_lio_state_to_log(fp);
     }
     //--------------------------save map---------------

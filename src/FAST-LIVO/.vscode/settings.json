@@ -28,7 +28,8 @@
         "qr": "cpp",
         "svd": "cpp",
         "condition_variable": "cpp",
-        "*.txx": "cpp"
+        "*.txx": "cpp",
+        "chrono": "cpp"
     },
     "python.autoComplete.extraPaths": [
         "/home/srr/projects/fast_livo/devel/lib/python3/dist-packages",

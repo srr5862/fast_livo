@@ -59,6 +59,7 @@ find_package(catkin REQUIRED COMPONENTS
   vikit_ros
   cv_bridge
   image_transport
+  fast_gicp
 )
 
 find_package(Eigen3 REQUIRED)
@@ -114,12 +115,21 @@ add_library(vio src/lidar_selection.cpp
                 src/point.cpp
                 src/map.cpp
                 )
+
 add_executable(fastlivo_mapping src/laserMapping.cpp 
                                 src/IMU_Processing.cpp
                                 src/preprocess.cpp
-                                ) 
+                                )
+# add_executable(localization src/localization.cpp) 
+add_executable(localization src/localization_fast_livo.cpp 
+                                src/IMU_Processing.cpp
+                                src/preprocess.cpp
+                                )                           
+                             
+target_link_libraries(localization ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} vio ikdtree)
 target_link_libraries(fastlivo_mapping ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} vio ikdtree)
 target_include_directories(fastlivo_mapping PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_include_directories(localization PRIVATE ${PYTHON_INCLUDE_DIRS})
 
 # add_executable(kd_tree_test include/ikd-Tree/ikd_Tree.cpp src/kd_tree_test.cpp)
 # target_link_libraries(kd_tree_test ${PCL_LIBRARIES})

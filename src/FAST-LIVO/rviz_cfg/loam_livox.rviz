@@ -12,11 +12,13 @@ Panels:
         - /mapping1/currPoints1
         - /mapping1/currPoints1/Autocompute Value Bounds1
         - /Odometry1
+        - /Odometry1/Odometry1
         - /Odometry1/Odometry1/Shape1
         - /Odometry1/Odometry2
         - /Odometry1/Odometry2/Shape1
         - /Path1
         - /surround1
+        - /PoseWithCovariance1
       Splitter Ratio: 0.520588219165802
     Tree Height: 827
   - Class: rviz/Selection
@@ -83,7 +85,7 @@ Visualization Manager:
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 238; 238; 236
-          Color Transformer: RGB8
+          Color Transformer: Intensity
           Decay Time: 999999
           Enabled: true
           Invert Rainbow: false
@@ -96,7 +98,7 @@ Visualization Manager:
           Size (Pixels): 1
           Size (m): 0.05000000074505806
           Style: Points
-          Topic: /cloud_registered
+          Topic: /cloud_registered_rgb
           Unreliable: true
           Use Fixed Frame: true
           Use rainbow: true
@@ -111,7 +113,7 @@ Visualization Manager:
           Channel Name: intensity
           Class: rviz/PointCloud2
           Color: 255; 255; 255
-          Color Transformer: FlatColor
+          Color Transformer: Intensity
           Decay Time: 0
           Enabled: true
           Invert Rainbow: true
@@ -126,7 +128,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /cloud_registered_rgb
+          Topic: /cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -187,7 +189,7 @@ Visualization Manager:
               Scale: 1
               Value: true
             Value: true
-          Enabled: false
+          Enabled: true
           Keep: 1
           Name: Odometry
           Position Tolerance: 0.0010000000474974513
@@ -204,7 +206,7 @@ Visualization Manager:
             Value: Axes
           Topic: /aft_mapped_to_init
           Unreliable: false
-          Value: false
+          Value: true
       Enabled: true
       Name: Odometry
     - Alpha: 0
@@ -243,7 +245,7 @@ Visualization Manager:
       Color: 30; 33; 255
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
@@ -251,14 +253,14 @@ Visualization Manager:
       Position Transformer: XYZ
       Queue Size: 1
       Selectable: false
-      Size (Pixels): 10
+      Size (Pixels): 3
       Size (m): 0.05000000074505806
       Style: Points
       Topic: /cloud_visual_sub_map
-      Unreliable: true
+      Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Class: rviz/Image
       Enabled: false
       Image Topic: /rgb_img
@@ -271,6 +273,48 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: false
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/PoseWithCovariance
+      Color: 255; 25; 0
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: PoseWithCovariance
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /initialpose
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Class: rviz/PointStamped
+      Color: 204; 41; 204
+      Enabled: true
+      History Length: 1
+      Name: PointStamped
+      Queue Size: 10
+      Radius: 0.20000000298023224
+      Topic: /clicked_point
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 0; 0; 0
@@ -299,7 +343,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 41.406394958496094
+      Distance: 26.24071502685547
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -307,17 +351,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 15.17094898223877
-        Y: -18.260622024536133
-        Z: 5.735116481781006
+        X: 0.6384409070014954
+        Y: 39.80059814453125
+        Z: 2.164309501647949
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9302029013633728
+      Pitch: 0.6452032327651978
       Target Frame: <Fixed Frame>
-      Yaw: 3.0129904747009277
+      Yaw: 3.557987928390503
     Saved: ~
 Window Geometry:
   Displays:
@@ -338,4 +382,4 @@ Window Geometry:
     collapsed: true
   Width: 1918
   X: 0
-  Y: 24
+  Y: 28

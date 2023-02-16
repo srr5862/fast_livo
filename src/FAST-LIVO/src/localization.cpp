@@ -72,6 +72,8 @@
 #include"lidar_selection.h"
 #include <fast_gicp/gicp/fast_gicp.hpp>
 #include <fast_gicp/gicp/fast_gicp_st.hpp>
+#include <fast_gicp/gicp/fast_vgicp.hpp>
+#include <pcl/visualization/pcl_visualizer.h>
 
 #ifdef USE_ikdtree
     #ifdef USE_ikdforest
@@ -144,6 +146,9 @@ int grid_size, patch_size;
 double outlier_threshold, ncc_thre;
 string destination;
 
+
+
+
 vector<BoxPointType> cub_needrm;
 vector<BoxPointType> cub_needad;
 // deque<sensor_msgs::PointCloud2::ConstPtr> lidar_buffer;
@@ -165,6 +170,7 @@ double total_residual;
 double LASER_POINT_COV, IMG_POINT_COV, cam_fx, cam_fy, cam_cx, cam_cy; 
 double cam_d0,cam_d1,cam_d2,cam_d3;
 bool flg_EKF_inited, flg_EKF_converged, EKF_stop_flg = 0;
+int scanNum = 1;
 //surf feature in map
 PointCloudXYZI::Ptr featsFromMap(new PointCloudXYZI());
 PointCloudXYZI::Ptr cube_points_add(new PointCloudXYZI());
@@ -173,6 +179,7 @@ PointCloudXYZI::Ptr sub_map_cur_frame_point(new PointCloudXYZI());
 PointCloudXYZI::Ptr cloud( new PointCloudXYZI());
 PointCloudXYZI::Ptr  tmp(new PointCloudXYZI());
 PointCloudXYZ::Ptr global_map(new PointCloudXYZ());
+PointCloudXYZ::Ptr aligned(new PointCloudXYZ());
 
 PointCloudXYZI::Ptr feats_undistort(new PointCloudXYZI());
 PointCloudXYZI::Ptr feats_down_body(new PointCloudXYZI());
@@ -184,6 +191,11 @@ PointCloudXYZI::Ptr corr_normvect(new PointCloudXYZI());
 pcl::VoxelGrid<PointType> downSizeFilterSurf;
 pcl::VoxelGrid<PointType> downSizeFilterMap;
 pcl::VoxelGrid<PointType> downSizeFilterGlobalMap;
+pcl::VoxelGrid<PointOwnType> downSizeInputCloud;
+pcl::VoxelGrid<PointOwnType> downSizeInputMap;
+
+fast_gicp::FastVGICP<PointOwnType,PointOwnType> fgicp_mt;
+
 
 #ifdef USE_ikdtree
     #ifdef USE_ikdforest
@@ -220,7 +232,6 @@ nav_msgs::Path path;
 nav_msgs::Odometry odomAftMapped;
 geometry_msgs::Quaternion geoQuat;
 geometry_msgs::PoseStamped msg_body_pose;
-
 
 shared_ptr<Preprocess> p_pre(new Preprocess());
 
@@ -888,41 +899,45 @@ bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& re
     return true;
 }
 
-const PointCloudXYZ::Ptr& XYZI2XYZ(const PointCloudXYZI::ConstPtr& cloud){
-    PointCloudXYZ::Ptr newCloud(new PointCloudXYZ());
+void XYZI2XYZ(const PointCloudXYZI::Ptr& cloud,const PointCloudXYZ::Ptr& newCloud){
     int size = cloud->points.size();
     for (int i = 0; i < size; i++){
         PointOwnType point;
         point.x = cloud->points[i].x;
         point.y = cloud->points[i].y;
         point.z = cloud->points[i].z;
-        newCloud->push_back(point); 
+        newCloud->push_back(point);
     }
-    return newCloud;
-
+    newCloud->width = 1;
+    newCloud->height = size;
 }
 
 template <typename Registration>
-void test_gicp(Registration& reg,const PointCloudXYZ::ConstPtr& target,const PointCloudXYZ::ConstPtr& source){
-    PointCloudXYZ::Ptr aligned(new PointCloudXYZ());
+void gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const PointCloudXYZ::Ptr& target){
     double fitness_score = 0.0;
-    // run 
     auto t1 = std::chrono::high_resolution_clock::now();
+    reg.setNumThreads(8);
+    fgicp_mt.setMaxCorrespondenceDistance(1.0);
+    reg.setResolution(1.0);
     reg.clearTarget();
     reg.clearSource();
-    reg.setInputTarget(target);
     reg.setInputSource(source);
+    reg.setInputTarget(target);
     reg.align(*aligned);
-
-    auto t2 = std::chrono::high_resolution_clock::now();
-
+    reg.swapSourceAndTarget();
+    // reg.getFinalTransformation().cast<double>();
     fitness_score = reg.getFitnessScore();
 
+    auto t2 = std::chrono::high_resolution_clock::now();
     double single = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1e6;
-    cout << " single task costs " << "[mesc]" << std::flush;
-
+    std::cout << "single:" << single << "[msec] " << endl;
 }
 
+void downSizeXYZ(pcl::VoxelGrid<PointOwnType>& grid ,const PointCloudXYZ::Ptr& cloud,double resolution){
+    grid.setInputCloud(cloud);
+    grid.setLeafSize(resolution,resolution,resolution);
+    grid.filter(*cloud);
+}
 
 void readParameters(ros::NodeHandle &nh)
 {
@@ -978,8 +993,19 @@ int main(int argc, char** argv)
     image_transport::ImageTransport it(nh);
     //读取参数
     readParameters(nh);
-    pcl::io::loadPCDFile("/home/srr/first.pcd",*global_map);
-    
+    pcl::io::loadPCDFile("/home/srr/map.pcd",*global_map);
+    cout << global_map->points.size()<<endl;
+    downSizeXYZ(downSizeInputMap,global_map,resolution);
+    cout << global_map->points.size()<<endl;
+    cout <<"------------------------------------------------sdasdadasd"<<endl;
+    std::vector<Eigen::Isometry3d,Eigen::aligned_allocator<Eigen::Isometry3d>> poses(global_map->points.size());
+    poses[0].setIdentity();
+
+    // pcl::visualization::PCLVisualizer visual;
+    // PointCloudXYZ::Ptr traj(new PointCloudXYZ());
+    // traj->push_back(PointOwnType(0.0f,0.0f,0.0f));
+
+    // visual.addPointCloud<PointOwnType>(traj,"traj");
     cout<<"debug:"<<debug<<" MIN_IMG_COUNT: "<<MIN_IMG_COUNT<<endl;
     pcl_wait_pub->clear();
     // pcl_visual_wait_pub->clear();
@@ -1599,17 +1625,20 @@ int main(int argc, char** argv)
         *pcl_wait_pub = *laserCloudWorld;
         cout << "===================" <<  laserCloudWorld->size() << endl;
         
-        *cloud += *laserCloudWorld;
-        PointCloudXYZ::Ptr newLaserCloudWorld(new PointCloudXYZ(laserCloudWorld->points.size(),1)); 
-        fast_gicp::FastGICP<PointOwnType,PointOwnType> fgicp_mt;
-        newLaserCloudWorld = XYZI2XYZ(laserCloudWorld);
-        cout << "start"<< endl;
-        fgicp_mt.setNumThreads(MP_PROC_NUM);
-        test_gicp(fgicp_mt,global_map,newLaserCloudWorld);
-        cout << "end" <<endl;
+        *cloud += *featsFromMap;
+        PointCloudXYZ::Ptr newLaserCloudWorld(new PointCloudXYZ()); 
+        XYZI2XYZ(featsFromMap,newLaserCloudWorld);
+        cout << "===================" <<  newLaserCloudWorld->size() << endl;
+        // downSizeXYZ(downSizeInputCloud,newLaserCloudWorld,resolution);
+        gicp(fgicp_mt,newLaserCloudWorld,global_map);
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_path(pubPath);
+        // cout << "scanNum : " << scanNum << endl;
+        // traj->push_back(pcl::PointXYZ(poses[scanNum](0, 3), poses[scanNum](1, 3), poses[scanNum](2, 3)));
+        // visual.updatePointCloud<PointOwnType>(traj,pcl::visualization::PointCloudColorHandlerCustom<PointOwnType>(traj,255.0,0.0,0.0),"traj");
+        // visual.spinOnce();
+        // scanNum++;
         #ifdef DEPLOY
         publish_mavros(mavros_pose_publisher);
         #endif

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fast_livo)
 
-SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_BUILD_TYPE "Release")
 
 ADD_COMPILE_OPTIONS(-std=c++14 )
 ADD_COMPILE_OPTIONS(-std=c++14 )
@@ -121,7 +121,7 @@ add_executable(fastlivo_mapping src/laserMapping.cpp
                                 src/preprocess.cpp
                                 )
 # add_executable(localization src/localization.cpp) 
-add_executable(localization src/localization_fast_livo.cpp 
+add_executable(localization src/localization.cpp 
                                 src/IMU_Processing.cpp
                                 src/preprocess.cpp
                                 )                           

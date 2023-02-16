@@ -1850,7 +1850,7 @@ int main(int argc, char** argv)
         *pcl_wait_pub = *laserCloudWorld;
         cout << "===================" <<  laserCloudWorld->size() << endl;
         
-        *cloud += *laserCloudWorld;
+        *cloud += *featsFromMap;
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_effect_world(pubLaserCloudEffect);

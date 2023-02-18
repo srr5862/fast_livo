@@ -195,6 +195,7 @@ pcl::VoxelGrid<PointOwnType> downSizeInputCloud;
 pcl::VoxelGrid<PointOwnType> downSizeInputMap;
 
 fast_gicp::FastVGICP<PointOwnType,PointOwnType> fgicp_mt;
+pcl::PointCloud<PointTypePose>::Ptr unoptimized_Pose6d(new pcl::PointCloud<PointTypePose>());
 
 
 #ifdef USE_ikdtree
@@ -216,6 +217,10 @@ Eigen::Vector3d Pcl;
 Eigen::Vector4d Dist;
 Eigen::Vector3d cam_K;
 Eigen::Vector3d I;
+Eigen::Matrix3f rot;
+
+
+
 
 //estimator inputs and output;
 LidarMeasureGroup LidarMeasures;
@@ -232,6 +237,8 @@ nav_msgs::Path path;
 nav_msgs::Odometry odomAftMapped;
 geometry_msgs::Quaternion geoQuat;
 geometry_msgs::PoseStamped msg_body_pose;
+geometry_msgs::Quaternion ownQuat;
+geometry_msgs::PoseStamped cur_pose;
 
 shared_ptr<Preprocess> p_pre(new Preprocess());
 
@@ -466,6 +473,14 @@ void lasermap_fov_segment()
 //     mtx_buffer.unlock();
 //     sig_buffer.notify_all();
 // }
+
+Eigen::Matrix3f Trans2Rot(Eigen::Matrix4f Trans){
+    Eigen::Matrix3f rot;
+    rot << Trans(0,0),Trans(0,1),Trans(0,2),
+            Trans(1,0),Trans(1,1),Trans(1,2),
+            Trans(2,0),Trans(2,1),Trans(2,2); 
+    return rot;
+}
 
 void livox_pcl_cbk(const livox_ros_driver2::CustomMsg::ConstPtr &msg) 
 {
@@ -858,6 +873,16 @@ void set_posestamp(T & out)
     out.orientation.w = geoQuat.w;
 }
 
+void setOwnPoseStamp(geometry_msgs::PoseStamped& out, Eigen::Vector3f & pos)
+{
+        out.pose.position.x = pos[0];
+        out.pose.position.y = pos[1];
+        out.pose.position.z = pos[2];
+        out.pose.orientation.x = ownQuat.x;
+        out.pose.orientation.y = ownQuat.y;
+        out.pose.orientation.z = ownQuat.z;
+        out.pose.orientation.w = ownQuat.w;
+}
 
 
 void publish_mavros(const ros::Publisher & mavros_pose_publisher)
@@ -868,16 +893,42 @@ void publish_mavros(const ros::Publisher & mavros_pose_publisher)
     mavros_pose_publisher.publish(msg_body_pose);
 }
 
+
+
+
+
 void publish_path(const ros::Publisher pubPath)
 {
     set_posestamp(msg_body_pose.pose);
     msg_body_pose.header.stamp = ros::Time::now();
     msg_body_pose.header.frame_id = "camera_init";
+    PointTypePose pose6d;
+    V3D rot_ang = RotMtoEuler(state.rot_end);
+    pose6d.x = msg_body_pose.pose.position.x;
+    pose6d.y = msg_body_pose.pose.position.y;
+    pose6d.z = msg_body_pose.pose.position.z;
+    pose6d.roll = rot_ang(0);
+    pose6d.pitch = rot_ang(1);
+    pose6d.yaw = rot_ang(2);
+    unoptimized_Pose6d->push_back(pose6d);
     path.poses.push_back(msg_body_pose);
     pubPath.publish(path);
 }
 
+Eigen::Vector3f computePose(){
+        Eigen::Vector3f t (msg_body_pose.pose.position.x,msg_body_pose.pose.position.y,msg_body_pose.pose.position.z);
+        Eigen::Vector3f  cur_pos = rot * t ;
+        return cur_pos;
 
+}
+
+void publish_pose(const ros::Publisher pubPose){
+    cur_pose.header.stamp = ros::Time::now();
+    cur_pose.header.frame_id = "camera_init";
+    Eigen::Vector3f cur_pos = computePose();
+    setOwnPoseStamp(cur_pose,cur_pos);
+    pubPose.publish(cur_pose);
+}
 
 bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& res){
     string saveMapDirectory;
@@ -888,7 +939,7 @@ bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& re
     downSizeFilterGlobalMap.setLeafSize(resolution,resolution,resolution);
     downSizeFilterGlobalMap.filter(*cloud);
     for(int i = 0 ; i < cloud_size; i++){
-        pcl::PointXYZ xyz;
+        pcl::PointXYZ xyz;  
         xyz.x = cloud->points[i].x;
         xyz.y = cloud->points[i].y;
         xyz.z = cloud->points[i].z;
@@ -913,11 +964,11 @@ void XYZI2XYZ(const PointCloudXYZI::Ptr& cloud,const PointCloudXYZ::Ptr& newClou
 }
 
 template <typename Registration>
-void gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const PointCloudXYZ::Ptr& target){
+Eigen::Matrix4f  gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const PointCloudXYZ::Ptr& target){
     double fitness_score = 0.0;
     auto t1 = std::chrono::high_resolution_clock::now();
     reg.setNumThreads(8);
-    fgicp_mt.setMaxCorrespondenceDistance(1.0);
+    reg.setMaxCorrespondenceDistance(1.0);
     reg.setResolution(1.0);
     reg.clearTarget();
     reg.clearSource();
@@ -925,19 +976,30 @@ void gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const PointCloudXYZ
     reg.setInputTarget(target);
     reg.align(*aligned);
     reg.swapSourceAndTarget();
-    // reg.getFinalTransformation().cast<double>();
+    Eigen::Matrix4f pose = reg.getFinalTransformation();
     fitness_score = reg.getFitnessScore();
-
     auto t2 = std::chrono::high_resolution_clock::now();
     double single = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1e6;
     std::cout << "single:" << single << "[msec] " << endl;
+    return pose;
 }
-
+ 
 void downSizeXYZ(pcl::VoxelGrid<PointOwnType>& grid ,const PointCloudXYZ::Ptr& cloud,double resolution){
     grid.setInputCloud(cloud);
     grid.setLeafSize(resolution,resolution,resolution);
     grid.filter(*cloud);
 }
+
+void loadGlobalMap(ros::Publisher pubg){
+    sensor_msgs::PointCloud2 points;
+    pcl::toROSMsg(*global_map,points);
+    points.header.frame_id = "camera_init";
+    points.header.stamp = ros::Time::now();
+    pubg.publish(points);
+    ros::spinOnce();
+
+}
+
 
 void readParameters(ros::NodeHandle &nh)
 {
@@ -986,26 +1048,20 @@ void readParameters(ros::NodeHandle &nh)
     nh.param<string>("destination",destination,"");
 }
 
+
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "lozalization");
     ros::NodeHandle nh;
     image_transport::ImageTransport it(nh);
-    //读取参数
     readParameters(nh);
     pcl::io::loadPCDFile("/home/srr/map.pcd",*global_map);
     cout << global_map->points.size()<<endl;
     downSizeXYZ(downSizeInputMap,global_map,resolution);
     cout << global_map->points.size()<<endl;
-    cout <<"------------------------------------------------sdasdadasd"<<endl;
-    std::vector<Eigen::Isometry3d,Eigen::aligned_allocator<Eigen::Isometry3d>> poses(global_map->points.size());
-    poses[0].setIdentity();
+    ros::Publisher pubGlobalMap  = nh.advertise<sensor_msgs::PointCloud2>("/global_map",5,true);
+    loadGlobalMap(pubGlobalMap);
 
-    // pcl::visualization::PCLVisualizer visual;
-    // PointCloudXYZ::Ptr traj(new PointCloudXYZ());
-    // traj->push_back(PointOwnType(0.0f,0.0f,0.0f));
-
-    // visual.addPointCloud<PointOwnType>(traj,"traj");
     cout<<"debug:"<<debug<<" MIN_IMG_COUNT: "<<MIN_IMG_COUNT<<endl;
     pcl_wait_pub->clear();
     // pcl_visual_wait_pub->clear();
@@ -1024,10 +1080,10 @@ int main(int argc, char** argv)
             ("/aft_mapped_to_init", 10);
     ros::Publisher pubPath          = nh.advertise<nav_msgs::Path> 
             ("/path", 10);
+    ros::Publisher pubPose = nh.advertise<geometry_msgs::PoseStamped>("/cur_pose",10);
     
     path.header.stamp    = ros::Time::now(  );
     path.header.frame_id ="camera_init";
-
     /*** variables definition ***/
     #ifndef USE_IKFOM
     VD(DIM_STATE) solution;
@@ -1343,7 +1399,7 @@ int main(int argc, char** argv)
         
         /*** iterated state estimation ***/
         #ifdef MP_EN
-        printf("[ LIO ]: Using multi-processor, used core number: %d.\n", MP_PROC_NUM);
+        printf("[ LIO ]: Using multi-processor, used core number: %d.\n", 1);
         #endif
         double t_update_start = omp_get_wtime();
         #ifdef USE_IKFOM
@@ -1363,7 +1419,7 @@ int main(int argc, char** argv)
 
         if(img_en)
         {
-            omp_set_num_threads(MP_PROC_NUM);
+            // omp_set_num_threads(MP_PROC_NUM);    
             #pragma omp parallel for
             for(int i=0;i<1;i++) {}
         }
@@ -1381,7 +1437,7 @@ int main(int argc, char** argv)
 
                 /** closest surface search and residual computation **/
                 #ifdef MP_EN
-                    omp_set_num_threads(MP_PROC_NUM);
+                    // omp_set_num_threads(MP_PROC_NUM);
                     #pragma omp parallel for
                 #endif
                 // normvec->resize(feats_down_size);
@@ -1627,32 +1683,24 @@ int main(int argc, char** argv)
         
         *cloud += *featsFromMap;
         PointCloudXYZ::Ptr newLaserCloudWorld(new PointCloudXYZ()); 
-        XYZI2XYZ(featsFromMap,newLaserCloudWorld);
+        XYZI2XYZ(laserCloudWorld,newLaserCloudWorld);
         cout << "===================" <<  newLaserCloudWorld->size() << endl;
+        
         // downSizeXYZ(downSizeInputCloud,newLaserCloudWorld,resolution);
-        gicp(fgicp_mt,newLaserCloudWorld,global_map);
+        Eigen::Matrix4f Trans = gicp(fgicp_mt,newLaserCloudWorld,global_map);
+        rot = Trans2Rot(Trans);
+        cout << "rot:" <<rot <<endl;
+        
+        Eigen::Vector3f ruler = RotMtoEuler(rot);
+        cout << "to euler " << ruler << endl;
+        
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_path(pubPath);
-        // cout << "scanNum : " << scanNum << endl;
-        // traj->push_back(pcl::PointXYZ(poses[scanNum](0, 3), poses[scanNum](1, 3), poses[scanNum](2, 3)));
-        // visual.updatePointCloud<PointOwnType>(traj,pcl::visualization::PointCloudColorHandlerCustom<PointOwnType>(traj,255.0,0.0,0.0),"traj");
-        // visual.spinOnce();
-        // scanNum++;
-        #ifdef DEPLOY
-        publish_mavros(mavros_pose_publisher);
-        #endif
+        publish_pose(pubPose);
 
 
-
-
-        /*** Debug variables ***/
-        frame_num ++;
-        aver_time_consu = aver_time_consu * (frame_num - 1) / frame_num + (t5 - t0) / frame_num;
-        aver_time_icp = aver_time_icp * (frame_num - 1)/frame_num + (t_update_end - t_update_start) / frame_num;
-        aver_time_match = aver_time_match * (frame_num - 1)/frame_num + (match_time)/frame_num;
-        #ifdef USE_IKFOM
-        aver_time_solve = aver_time_solve * (frame_num - 1)/frame_num + (solve_time + solve_H_time)/frame_num;
+        #ifdef DEPLOY2023-02-18 19:48:11.516 | INFO   _time_solve * (frame_num - 1)/frame_num + (solve_time + solve_H_time)/frame_num;
         aver_time_const_H_time = aver_time_const_H_time * (frame_num - 1)/frame_num + solve_time / frame_num;
         #else
         aver_time_solve = aver_time_solve * (frame_num - 1)/frame_num + (solve_time)/frame_num;

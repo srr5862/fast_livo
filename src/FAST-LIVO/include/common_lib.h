@@ -55,6 +55,7 @@ typedef pcl::PointCloud<PointType> PointCloudXYZI;
 typedef vector<PointType, Eigen::aligned_allocator<PointType>>  PointVector;
 typedef pcl::PointCloud<PointTypeRGB> PointCloudXYZRGB;
 
+
 typedef Vector3d V3D;
 typedef Vector2d V2D;
 typedef Matrix3d M3D;

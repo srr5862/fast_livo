@@ -16,7 +16,8 @@ lidar_enable : 1
 outlier_threshold : 300 # 78 100 156
 ncc_en: false
 ncc_thre: 0
-resolution: 1
+mapping_resolution: 0.1
+localization_resolution: 0.5
 destination: ""
 #import
 

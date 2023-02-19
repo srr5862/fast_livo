@@ -110,7 +110,7 @@ Vector3d Lidar_offset_to_IMU;
 int iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0,\
     effct_feat_num = 0, time_log_counter = 0, publish_count = 0;
 int MIN_IMG_COUNT = 0;
-double resolution = 0.5;
+double mapping_resolution = 0.5;
 double res_mean_last = 0.05;
 //double gyr_cov_scale, acc_cov_scale;
 double gyr_cov_scale = 0, acc_cov_scale = 0;
@@ -1135,7 +1135,7 @@ bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& re
     PointCloudXYZ::Ptr pxyz(new PointCloudXYZ());
     int cloud_size = cloud->points.size();
     downSizeFilterGlobalMap.setInputCloud(cloud);
-    downSizeFilterGlobalMap.setLeafSize(resolution,resolution,resolution);
+    downSizeFilterGlobalMap.setLeafSize(mapping_resolution,mapping_resolution,mapping_resolution);
     downSizeFilterGlobalMap.filter(*cloud);
     for(int i = 0 ; i < cloud_size; i++){
         pcl::PointXYZ xyz;
@@ -1144,7 +1144,7 @@ bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& re
         xyz.z = cloud->points[i].z;
         pxyz->push_back(xyz);
     }
-    pcl::io::savePCDFileBinary("/home/srr/map.pcd",*pxyz);
+    pcl::io::savePCDFileBinary("/home/srr/projects/fast_livo/src/FAST_LIVO/map/map.pcd",*pxyz);
     cout << "map finish" <<endl;
     return true;
 }
@@ -1192,7 +1192,7 @@ void readParameters(ros::NodeHandle &nh)
     nh.param<int>("patch_size", patch_size, 4);
     nh.param<double>("outlier_threshold",outlier_threshold,100);
     nh.param<double>("ncc_thre", ncc_thre, 100);
-    nh.param<double>("resolution",resolution,0.5);
+    nh.param<double>("mapping_resolution",mapping_resolution,0.1);
     nh.param<string>("destination",destination,"");
 }
 

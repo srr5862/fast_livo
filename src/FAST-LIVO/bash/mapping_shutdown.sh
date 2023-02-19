@@ -1,0 +1,1 @@
+rosservice call /save_map

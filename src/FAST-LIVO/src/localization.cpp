@@ -115,7 +115,7 @@ Vector3d Lidar_offset_to_IMU;
 int iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0,\
     effct_feat_num = 0, time_log_counter = 0, publish_count = 0;
 int MIN_IMG_COUNT = 0;
-double resolution = 0.5;
+double localization_resolution = 0.5;
 double res_mean_last = 0.05;
 //double gyr_cov_scale, acc_cov_scale;
 double gyr_cov_scale = 0, acc_cov_scale = 0;
@@ -930,25 +930,7 @@ void publish_pose(const ros::Publisher pubPose){
     pubPose.publish(cur_pose);
 }
 
-bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& res){
-    string saveMapDirectory;
-    cout << "save map" << endl;
-    PointCloudXYZ::Ptr pxyz(new PointCloudXYZ());
-    int cloud_size = cloud->points.size();
-    downSizeFilterGlobalMap.setInputCloud(cloud);
-    downSizeFilterGlobalMap.setLeafSize(resolution,resolution,resolution);
-    downSizeFilterGlobalMap.filter(*cloud);
-    for(int i = 0 ; i < cloud_size; i++){
-        pcl::PointXYZ xyz;  
-        xyz.x = cloud->points[i].x;
-        xyz.y = cloud->points[i].y;
-        xyz.z = cloud->points[i].z;
-        pxyz->push_back(xyz);
-    }
-    pcl::io::savePCDFileBinary("/home/srr/map.pcd",*pxyz);
-    cout << "map finish" <<endl;
-    return true;
-}
+
 
 void XYZI2XYZ(const PointCloudXYZI::Ptr& cloud,const PointCloudXYZ::Ptr& newCloud){
     int size = cloud->points.size();
@@ -969,7 +951,7 @@ Eigen::Matrix4f  gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const P
     auto t1 = std::chrono::high_resolution_clock::now();
     reg.setNumThreads(8);
     reg.setMaxCorrespondenceDistance(1.0);
-    reg.setResolution(1.0);
+    reg.setResolution(0.5);
     reg.clearTarget();
     reg.clearSource();
     reg.setInputSource(source);
@@ -1044,7 +1026,7 @@ void readParameters(ros::NodeHandle &nh)
     nh.param<int>("patch_size", patch_size, 4);
     nh.param<double>("outlier_threshold",outlier_threshold,100);
     nh.param<double>("ncc_thre", ncc_thre, 100);
-    nh.param<double>("resolution",resolution,0.5);
+    nh.param<double>("localization_resolution",localization_resolution,0.5);
     nh.param<string>("destination",destination,"");
 }
 
@@ -1057,7 +1039,7 @@ int main(int argc, char** argv)
     readParameters(nh);
     pcl::io::loadPCDFile("/home/srr/map.pcd",*global_map);
     cout << global_map->points.size()<<endl;
-    downSizeXYZ(downSizeInputMap,global_map,resolution);
+    downSizeXYZ(downSizeInputMap,global_map,localization_resolution);
     cout << global_map->points.size()<<endl;
     ros::Publisher pubGlobalMap  = nh.advertise<sensor_msgs::PointCloud2>("/global_map",5,true);
     loadGlobalMap(pubGlobalMap);
@@ -1069,7 +1051,6 @@ int main(int argc, char** argv)
     ros::Subscriber sub_pcl = nh.subscribe(lid_topic, 200000, livox_pcl_cbk);
     ros::Subscriber sub_imu = nh.subscribe(imu_topic, 200000, imu_cbk);
     ros::Subscriber sub_img = nh.subscribe(img_topic, 200000, img_cbk);
-    ros::ServiceServer map_server = nh.advertiseService("/save_map",map_cbk);
     image_transport::Publisher img_pub = it.advertise("/rgb_img", 1);
     ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::    PointCloud2>
             ("/cloud_registered", 100);

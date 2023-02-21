@@ -1,6 +1,6 @@
 feature_extract_enable : 1
 #update 2->3->4
-point_filter_num : 3
+point_filter_num : 6
 max_iteration : 10
 dense_map_enable : 0
 #0.5 -> 0.08->0.0.5
@@ -16,7 +16,7 @@ lidar_enable : 1
 outlier_threshold : 300 # 78 100 156
 ncc_en: false
 ncc_thre: 0
-mapping_resolution: 0.1
+mapping_resolution: 0.3
 localization_resolution: 0.5
 destination: ""
 #import
@@ -50,13 +50,14 @@ common:
 preprocess:
     lidar_type: 1 # Livox Avia LiDAR
     scan_line: 6
-    blind: 3 # blind x m disable
+    blind: 0.01 # blind x m disable
 
 mapping:
     acc_cov_scale: 100
     gyr_cov_scale: 10000
     fov_degree:    120
-    extrinsic_T: [ 0.04165, 0.02326, -0.0284 ]
+    extrinsic_T: [ 0.04165, 0.02326, -0.0284 ]  
+    # extrinsic_T: [ -0.05165, 0.05326, -0.0284 ]
     extrinsic_R: [ 1, 0, 0,
                    0, 1, 0,
                    0, 0, 1]

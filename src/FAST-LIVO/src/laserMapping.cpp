@@ -514,7 +514,6 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr& img_msg) {
 }
 
 
-void map_cbk(){}
 
 
 void img_cbk(const sensor_msgs::ImageConstPtr& msg)
@@ -753,7 +752,7 @@ void publish_frame_world_rgb(const ros::Publisher & pubLaserCloudFullRes, lidar_
     //                         &laserCloudWorld->points[i]);
     // }
 
-
+// import 
     uint size = pcl_wait_pub->points.size();
     PointCloudXYZRGB::Ptr laserCloudWorldRGB(new PointCloudXYZRGB(size, 1));
     if(img_en)
@@ -1003,7 +1002,8 @@ void h_share_model(state_ikfom &s, esekfom::dyn_share_datastruct<double> &ekfom_
 
     /** closest surface search and residual computation **/
     #ifdef MP_EN
-        omp_set_num_threads(MP_PROC_NUM);
+        // omp_set_num_threads(MP_PROC_NUM);
+        // omp_set_num_threads(1);
         #pragma omp parallel for
     #endif
     for (int i = 0; i < feats_down_size; i++)
@@ -1144,7 +1144,7 @@ bool map_cbk(fast_livo::save_map::Request& req,fast_livo::save_map::Response& re
         xyz.z = cloud->points[i].z;
         pxyz->push_back(xyz);
     }
-    pcl::io::savePCDFileBinary("/home/srr/projects/fast_livo/src/FAST_LIVO/map/map.pcd",*pxyz);
+    pcl::io::savePCDFileBinary(root_dir+"/map/map.pcd",*pxyz);
     cout << "map finish" <<endl;
     return true;
 }
@@ -1311,14 +1311,14 @@ int main(int argc, char** argv)
     kf.init_dyn_share(get_f, df_dx, df_dw, h_share_model, NUM_MAX_ITERATIONS, epsi);
     #endif
     /*** debug record ***/
-    FILE *fp;
-    string pos_log_dir = root_dir + "/Log/pos_log.txt";
-    fp = fopen(pos_log_dir.c_str(),"w");
+    // FILE *fp;
+    // string pos_log_dir = root_dir + "/Log/pos_log.txt";
+    // fp = fopen(pos_log_dir.c_str(),"w");
 
-    ofstream fout_pre, fout_out, fout_dbg;
-    fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
-    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
-    fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
+    // ofstream fout_pre, fout_out, fout_dbg;
+    // fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
+    // fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
+    // fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
     // if (fout_pre && fout_out)
     //     cout << "~~~~"<<ROOT_DIR<<" file opened" << endl;
     // else
@@ -1402,8 +1402,8 @@ int main(int argc, char** argv)
             // cout<<"cur state:"<<state.rot_end<<endl;
             if (img_en) {
                 euler_cur = RotMtoEuler(state.rot_end);
-                fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-                                <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
+                // fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+                //                 <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
                 
                 // lidar_selector->detect(LidarMeasures.measures.back().img, feats_undistort);
                 // mtx_buffer_pointcloud.lock();
@@ -1459,8 +1459,8 @@ int main(int argc, char** argv)
                 geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
                 publish_odometry(pubOdomAftMapped);
                 euler_cur = RotMtoEuler(state.rot_end);
-                fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-                <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
+                // fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+                // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
             }
             continue;
         }
@@ -1530,11 +1530,11 @@ int main(int argc, char** argv)
             euler_cur = RotMtoEuler(state.rot_end);
             #ifdef USE_IKFOM
             //state_ikfom fout_state = kf.get_x();
-            fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
-            <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
+            // fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
+            // <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
             #else
-            fout_pre << setw(20) << LidarMeasures.last_update_time  - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
+            // fout_pre << setw(20) << LidarMeasures.last_update_time  - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
             #endif
         }
 
@@ -1586,7 +1586,8 @@ int main(int argc, char** argv)
 
         if(img_en)
         {
-            omp_set_num_threads(MP_PROC_NUM);
+            // omp_set_num_threads(MP_PROC_NUM);
+            // omp_set_num_threads(1);
             #pragma omp parallel for
             for(int i=0;i<1;i++) {}
         }
@@ -1604,7 +1605,8 @@ int main(int argc, char** argv)
 
                 /** closest surface search and residual computation **/
                 #ifdef MP_EN
-                    omp_set_num_threads(MP_PROC_NUM);
+                    // omp_set_num_threads(MP_PROC_NUM);
+                    // omp_set_num_threads(1);
                     #pragma omp parallel for
                 #endif
                 // normvec->resize(feats_down_size);
@@ -1822,11 +1824,12 @@ int main(int argc, char** argv)
             }
         }
         
-        // cout<<"[ mapping ]: iteration count: "<<iterCount+1<<endl;
+        // cout<<"[ mapping ]: iteration count: "<<iterCount+1<<是endl;
         #endif
         // SaveTrajTUM(LidarMeasures.lidar_beg_time, state.rot_end, state.pos_end);
         double t_update_end = omp_get_wtime();
         /******* Publish odometry *******/
+        cout << "pos: " <<state.pos_end << endl;
         euler_cur = RotMtoEuler(state.rot_end);
         geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
         publish_odometry(pubOdomAftMapped);
@@ -1893,8 +1896,8 @@ int main(int argc, char** argv)
             fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
             <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<<" "<<feats_undistort->points.size()<<endl;
             #else
-            fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
+            // fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
             #endif
         }
         // saveGlobalMap();
@@ -1919,35 +1922,35 @@ int main(int argc, char** argv)
     // }
 
     #ifndef DEPLOY
-    vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    
-    FILE *fp2;
-    string log_dir = root_dir + "/Log/fast_livo_time_log.csv";
-    fp2 = fopen(log_dir.c_str(),"w");
-    fprintf(fp2,"time_stamp, average time, incremental time, search time,fov check time, total time, alpha_bal, alpha_del\n");
-    for (int i = 0;i<time_log_counter; i++){
-        fprintf(fp2,"%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i],s_plot7[i]);
-        t.push_back(T1[i]);
-        s_vec.push_back(s_plot[i]);
-        s_vec2.push_back(s_plot2[i]);
-        s_vec3.push_back(s_plot3[i]);
-        s_vec4.push_back(s_plot4[i]);
-        s_vec5.push_back(s_plot5[i]);
-        s_vec6.push_back(s_plot6[i]);        
-        s_vec7.push_back(s_plot7[i]);                             
-    }
-    fclose(fp2);
-    if (!t.empty())
-    {
-        // plt::named_plot("incremental time",t,s_vec2);
-        // plt::named_plot("search_time",t,s_vec3);
-        // plt::named_plot("total time",t,s_vec5);
-        // plt::named_plot("average time",t,s_vec);
-        // plt::legend();
-        // plt::show();
-        // plt::pause(0.5);
-        // plt::close();
-    }
-    cout << "no points saved" << endl;
+    // vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    
+    // FILE *fp2;
+    // string log_dir = root_dir + "/Log/fast_livo_time_log.csv";
+    // fp2 = fopen(log_dir.c_str(),"w");
+    // fprintf(fp2,"time_stamp, average time, incremental time, search time,fov check time, total time, alpha_bal, alpha_del\n");
+    // for (int i = 0;i<time_log_counter; i++){
+    //     fprintf(fp2,"%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i],s_plot7[i]);
+    //     t.push_back(T1[i]);
+    //     s_vec.push_back(s_plot[i]);
+    //     s_vec2.push_back(s_plot2[i]);
+    //     s_vec3.push_back(s_plot3[i]);
+    //     s_vec4.push_back(s_plot4[i]);
+    //     s_vec5.push_back(s_plot5[i]);
+    //     s_vec6.push_back(s_plot6[i]);        
+    //     s_vec7.push_back(s_plot7[i]);                             
+    // }
+    // fclose(fp2);
+    // if (!t.empty())
+    // {
+    //     // plt::named_plot("incremental time",t,s_vec2);
+    //     // plt::named_plot("search_time",t,s_vec3);
+    //     // plt::named_plot("total time",t,s_vec5);
+    //     // plt::named_plot("average time",t,s_vec);
+    //     // plt::legend();
+    //     // plt::show();
+    //     // plt::pause(0.5);
+    //     // plt::close();
+    // }
+    // cout << "no points saved" << endl;
     #endif
 
     return 0;

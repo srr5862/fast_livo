@@ -112,6 +112,7 @@ V3D Zero3d(0, 0, 0);
 V3F Zero3f(0, 0, 0);
 // Vector3d Lidar_offset_to_IMU(0.04165, 0.02326, -0.0284); // Avia
 Vector3d Lidar_offset_to_IMU;
+M3D Lidar_Rot_to_IMU;
 int iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0,\
     effct_feat_num = 0, time_log_counter = 0, publish_count = 0;
 int MIN_IMG_COUNT = 0;
@@ -145,6 +146,7 @@ bool fast_lio_is_ready = false;
 int grid_size, patch_size;
 double outlier_threshold, ncc_thre;
 string destination;
+bool pos_flag = true;
 
 
 
@@ -194,7 +196,7 @@ pcl::VoxelGrid<PointType> downSizeFilterGlobalMap;
 pcl::VoxelGrid<PointOwnType> downSizeInputCloud;
 pcl::VoxelGrid<PointOwnType> downSizeInputMap;
 
-fast_gicp::FastVGICP<PointOwnType,PointOwnType> fgicp_mt;
+fast_gicp::FastGICP<PointOwnType,PointOwnType> fgicp_mt;
 pcl::PointCloud<PointTypePose>::Ptr unoptimized_Pose6d(new pcl::PointCloud<PointTypePose>());
 
 
@@ -217,8 +219,8 @@ Eigen::Vector3d Pcl;
 Eigen::Vector4d Dist;
 Eigen::Vector3d cam_K;
 Eigen::Vector3d I;
-Eigen::Matrix3f rot;
-
+Eigen::Matrix3d rot;
+Eigen::Vector3d Ori_pos;
 
 
 
@@ -449,37 +451,17 @@ void lasermap_fov_segment()
 
 
 
-
-
-// void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg) 
-// {
-//     mtx_buffer.lock();
-//     // cout<<"got feature"<<endl;
-//     if (msg->header.stamp.toSec() < last_timestamp_lidar)
-//     {
-//         ROS_ERROR("lidar loop back, clear buffer");
-//         lidar_buffer.clear();
-//     }
-    
-//     PointCloudXYZI::Ptr  ptr(new PointCloudXYZI());
-//     p_pre->process(msg, ptr);
-//     // ROS_INFO("get point cloud at time: %.6f and size: %d", msg->header.stamp.toSec() - 0.1, ptr->points.size());
-//     printf("[ INFO ]: get point cloud at time: %.6f and size: %d.\n", msg->header.stamp.toSec(), int(ptr->points.size()));
-//     lidar_buffer.push_back(ptr);
-//     // time_buffer.push_back(msg->header.stamp.toSec() - 0.1);
-//     // last_timestamp_lidar = msg->header.stamp.toSec() - 0.1;
-//     time_buffer.push_back(msg->header.stamp.toSec());
-//     last_timestamp_lidar = msg->header.stamp.toSec();
-//     mtx_buffer.unlock();
-//     sig_buffer.notify_all();
-// }
-
-Eigen::Matrix3f Trans2Rot(Eigen::Matrix4f Trans){
-    Eigen::Matrix3f rot;
+Eigen::Matrix3d Trans2Rot(Eigen::Matrix4d Trans){
+    Eigen::Matrix3d rot;
     rot << Trans(0,0),Trans(0,1),Trans(0,2),
             Trans(1,0),Trans(1,1),Trans(1,2),
             Trans(2,0),Trans(2,1),Trans(2,2); 
     return rot;
+}
+
+Eigen::Vector3d Trans2T(Eigen::Matrix4d Trans){
+    return Eigen::Vector3d (Trans(0,3),Trans(1,3),Trans(2,3));
+
 }
 
 void livox_pcl_cbk(const livox_ros_driver2::CustomMsg::ConstPtr &msg) 
@@ -753,6 +735,21 @@ bool sync_packages(LidarMeasureGroup &meas)
 // }
 
 
+void map_incremental()
+{
+    for (int i = 0; i < feats_down_size; i++)
+    {
+        /* transform to world frame */
+        pointBodyToWorld(&(feats_down_body->points[i]), &(feats_down_world->points[i]));
+    }
+#ifdef USE_ikdtree
+    #ifdef USE_ikdforest
+    ikdforest.Add_Points(feats_down_world->points, lidar_end_time);
+    #else
+    ikdtree.Add_Points(feats_down_world->points, true);
+    #endif
+#endif
+}
 
 // PointCloudXYZRGB::Ptr pcl_wait_pub_RGB(new PointCloudXYZRGB(500000, 1));
 PointCloudXYZI::Ptr pcl_wait_pub(new PointCloudXYZI());
@@ -863,7 +860,6 @@ void publish_frame_world(const ros::Publisher & pubLaserCloudFullRes)
 template<typename T>
 void set_posestamp(T & out)
 {
-    
     out.position.x = state.pos_end(0);
     out.position.y = state.pos_end(1);
     out.position.z = state.pos_end(2);
@@ -873,16 +869,7 @@ void set_posestamp(T & out)
     out.orientation.w = geoQuat.w;
 }
 
-void setOwnPoseStamp(geometry_msgs::PoseStamped& out, Eigen::Vector3f & pos)
-{
-        out.pose.position.x = pos[0];
-        out.pose.position.y = pos[1];
-        out.pose.position.z = pos[2];
-        out.pose.orientation.x = ownQuat.x;
-        out.pose.orientation.y = ownQuat.y;
-        out.pose.orientation.z = ownQuat.z;
-        out.pose.orientation.w = ownQuat.w;
-}
+
 
 
 void publish_mavros(const ros::Publisher & mavros_pose_publisher)
@@ -902,32 +889,73 @@ void publish_path(const ros::Publisher pubPath)
     set_posestamp(msg_body_pose.pose);
     msg_body_pose.header.stamp = ros::Time::now();
     msg_body_pose.header.frame_id = "camera_init";
-    PointTypePose pose6d;
-    V3D rot_ang = RotMtoEuler(state.rot_end);
-    pose6d.x = msg_body_pose.pose.position.x;
-    pose6d.y = msg_body_pose.pose.position.y;
-    pose6d.z = msg_body_pose.pose.position.z;
-    pose6d.roll = rot_ang(0);
-    pose6d.pitch = rot_ang(1);
-    pose6d.yaw = rot_ang(2);
-    unoptimized_Pose6d->push_back(pose6d);
     path.poses.push_back(msg_body_pose);
     pubPath.publish(path);
 }
 
-Eigen::Vector3f computePose(){
-        Eigen::Vector3f t (msg_body_pose.pose.position.x,msg_body_pose.pose.position.y,msg_body_pose.pose.position.z);
-        Eigen::Vector3f  cur_pos = rot * t ;
-        return cur_pos;
+template<typename T>
+void setPos(T & out){
+    out.position.x = unoptimized_Pose6d->at(unoptimized_Pose6d->size()-1).x;
+    out.position.y = unoptimized_Pose6d->at(unoptimized_Pose6d->size()-1).y;
+    out.position.z = unoptimized_Pose6d->at(unoptimized_Pose6d->size()-1).z;
+    out.orientation.x = ownQuat.x;
+    out.orientation.y = ownQuat.y;
+    out.orientation.z = ownQuat.z;
+    out.orientation.w = ownQuat.w;
 
 }
 
-void publish_pose(const ros::Publisher pubPose){
-    cur_pose.header.stamp = ros::Time::now();
-    cur_pose.header.frame_id = "camera_init";
-    Eigen::Vector3f cur_pos = computePose();
-    setOwnPoseStamp(cur_pose,cur_pos);
-    pubPose.publish(cur_pose);
+
+void publish_Pose(const ros::Publisher pubPath){
+        setPos(cur_pose.pose);
+        cur_pose.header.stamp = ros::Time::now();
+        cur_pose.header.frame_id = "camera_init";
+        path.poses.push_back(cur_pose);
+        pubPath.publish(path);
+}
+
+// void publish_path(const ros::Publisher pubPath)
+// {
+//      setPos(cur_pose.pose);
+//     msg_body_pose.header.stamp = ros::Time::now();
+//     msg_body_pose.header.frame_id = "camera_init";
+//     path.poses.push_back(cur_pose);
+//     pubPath.publish(path);
+// }
+
+void computePose(Eigen::Matrix4d& T,bool is_first){
+        // pcl::PointCloud<PointTypePose>::Ptr poseList(new pcl::PointCloud<PointTypePose>());
+        M3D R = Trans2Rot(T);
+        V3D t = Trans2T(T);
+        V3D tl;
+        PointTypePose pose;
+        int size  = unoptimized_Pose6d->size();
+        M3D re = R * state.rot_end;
+        V3D rot_ang = RotMtoEuler(re);
+        cout << "size:" << size<< endl;
+        if(is_first){
+          
+            tl = R * Ori_pos + t;
+            pose.x = tl(0);
+            pose.y = tl(1);
+            pose.z = tl(2);
+            cout  <<  " ori T:" << tl<<endl;
+            ownQuat = tf::createQuaternionMsgFromRollPitchYaw(0,0,0);
+            cout << "ori_pos" <<Ori_pos << endl;
+
+        
+        }else{
+            // V3D pos (unoptimized_Pose6d->at(size-1).x,unoptimized_Pose6d->at(size-1).y,unoptimized_Pose6d->at(size-1).z);             
+            tl =  R * state.pos_end  + t;
+            cout << "tl" <<tl <<endl ;
+            pose.x = tl(0);
+            pose.y = tl(1);
+            pose.z = tl(2);
+            ownQuat = tf::createQuaternionMsgFromRollPitchYaw(rot_ang(0),rot_ang(1),rot_ang(2));
+        }
+       
+        unoptimized_Pose6d->push_back(pose);
+        cout << "own Quat" <<ownQuat;
 }
 
 
@@ -945,25 +973,23 @@ void XYZI2XYZ(const PointCloudXYZI::Ptr& cloud,const PointCloudXYZ::Ptr& newClou
     newCloud->height = size;
 }
 
-template <typename Registration>
-Eigen::Matrix4f  gicp(Registration& reg,const PointCloudXYZ::Ptr& source,const PointCloudXYZ::Ptr& target){
+Eigen::Matrix4d gicp_test(fast_gicp::FastGICP<PointOwnType,PointOwnType> gicp,const PointCloudXYZ::Ptr& source,const PointCloudXYZ::Ptr& target){
     double fitness_score = 0.0;
     auto t1 = std::chrono::high_resolution_clock::now();
-    reg.setNumThreads(8);
-    reg.setMaxCorrespondenceDistance(1.0);
-    reg.setResolution(0.5);
-    reg.clearTarget();
-    reg.clearSource();
-    reg.setInputSource(source);
-    reg.setInputTarget(target);
-    reg.align(*aligned);
-    reg.swapSourceAndTarget();
-    Eigen::Matrix4f pose = reg.getFinalTransformation();
-    fitness_score = reg.getFitnessScore();
+    gicp.setNumThreads(8);
+    gicp.setMaxCorrespondenceDistance(1.0);
+    gicp.clearTarget();
+    gicp.clearSource();
+    gicp.setInputSource(source);
+    gicp.setInputTarget(target);
+    gicp.align(*aligned);
+    gicp.swapSourceAndTarget();
+    fitness_score = gicp.getFitnessScore();
+    cout << " score:" << fitness_score << endl;
     auto t2 = std::chrono::high_resolution_clock::now();
     double single = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() / 1e6;
     std::cout << "single:" << single << "[msec] " << endl;
-    return pose;
+    return gicp.getFinalTransformation().cast<double>();
 }
  
 void downSizeXYZ(pcl::VoxelGrid<PointOwnType>& grid ,const PointCloudXYZ::Ptr& cloud,double resolution){
@@ -979,6 +1005,16 @@ void loadGlobalMap(ros::Publisher pubg){
     points.header.stamp = ros::Time::now();
     pubg.publish(points);
     ros::spinOnce();
+
+}
+
+void publish_odometry(const ros::Publisher & pubOdomAftMapped){
+    odomAftMapped.header.frame_id = "camera_init";
+    odomAftMapped.child_frame_id = "aft_mapped";
+    odomAftMapped.header.stamp = ros::Time::now();//.ros::Time()fromSec(last_timestamp_lidar);
+    set_posestamp(odomAftMapped.pose.pose);
+    pubOdomAftMapped.publish(odomAftMapped);
+
 
 }
 
@@ -1037,13 +1073,14 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
     image_transport::ImageTransport it(nh);
     readParameters(nh);
-    pcl::io::loadPCDFile("/home/srr/map.pcd",*global_map);
+    pcl::io::loadPCDFile(root_dir+"/map/map.pcd",*global_map);
     cout << global_map->points.size()<<endl;
     downSizeXYZ(downSizeInputMap,global_map,localization_resolution);
     cout << global_map->points.size()<<endl;
     ros::Publisher pubGlobalMap  = nh.advertise<sensor_msgs::PointCloud2>("/global_map",5,true);
     loadGlobalMap(pubGlobalMap);
 
+    Ori_pos << 0.0,0.0,0.0;
     cout<<"debug:"<<debug<<" MIN_IMG_COUNT: "<<MIN_IMG_COUNT<<endl;
     pcl_wait_pub->clear();
     // pcl_visual_wait_pub->clear();
@@ -1061,7 +1098,7 @@ int main(int argc, char** argv)
             ("/aft_mapped_to_init", 10);
     ros::Publisher pubPath          = nh.advertise<nav_msgs::Path> 
             ("/path", 10);
-    ros::Publisher pubPose = nh.advertise<geometry_msgs::PoseStamped>("/cur_pose",10);
+    // ros::Publisher pubPose = nh.advertise<geometry_msgs::PoseStamped>("/cur_pose",10);
     
     path.header.stamp    = ros::Time::now(  );
     path.header.frame_id ="camera_init";
@@ -1091,6 +1128,7 @@ int main(int argc, char** argv)
     extT<<VEC_FROM_ARRAY(extrinT);
     extR<<MAT_FROM_ARRAY(extrinR);
     Lidar_offset_to_IMU = extT;
+    Lidar_Rot_to_IMU = extR;
     lidar_selection::LidarSelectorPtr lidar_selector(new lidar_selection::LidarSelector(grid_size, new SparseMap));
     if(!vk::camera_loader::loadFromRosNs("localization", lidar_selector->cam))
         throw std::runtime_error("Camera model not correctly specified.");
@@ -1126,19 +1164,19 @@ int main(int argc, char** argv)
     #endif
 
    
-    /*** debug record ***/
-    FILE *fp;
-    string pos_log_dir = root_dir + "/Log/pos_log.txt";
-    fp = fopen(pos_log_dir.c_str(),"w");
+    // /*** debug record ***/
+    // FILE *fp;
+    // string pos_log_dir = root_dir + "/Log/pos_log.txt";
+    // fp = fopen(pos_log_dir.c_str(),"w");
 
-    ofstream fout_pre, fout_out, fout_dbg;
-    fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
-    fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
-    fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
-    // if (fout_pre && fout_out)
-    //     cout << "~~~~"<<ROOT_DIR<<" file opened" << endl;
-    // else
-    //     cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << endl;
+    // ofstream fout_pre, fout_out, fout_dbg;
+    // fout_pre.open(DEBUG_FILE_DIR("mat_pre.txt"),ios::out);
+    // fout_out.open(DEBUG_FILE_DIR("mat_out.txt"),ios::out);
+    // fout_dbg.open(DEBUG_FILE_DIR("dbg.txt"),ios::out);
+    // // if (fout_pre && fout_out)
+    // //     cout << "~~~~"<<ROOT_DIR<<" file opened" << endl;
+    // // else
+    // //     cout << "~~~~"<<ROOT_DIR<<" doesn't exist" << endl;
 
     #ifdef USE_ikdforest
         ikdforest.Set_balance_criterion_param(0.6);
@@ -1218,8 +1256,8 @@ int main(int argc, char** argv)
             // cout<<"cur state:"<<state.rot_end<<endl;
             if (img_en) {
                 euler_cur = RotMtoEuler(state.rot_end);
-                fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-                                <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
+                // fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+                //                 <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
                 
                 // lidar_selector->detect(LidarMeasures.measures.back().img, feats_undistort);
                 // mtx_buffer_pointcloud.lock();
@@ -1264,7 +1302,7 @@ int main(int argc, char** argv)
                 out_msg.encoding = sensor_msgs::image_encodings::BGR8;
                 out_msg.image = img_rgb;
                 img_pub.publish(out_msg.toImageMsg());
-
+                //import
                 publish_frame_world_rgb(pubLaserCloudFullResRgb, lidar_selector);
                 
                 // *map_cur_frame_point = *pcl_wait_pub;
@@ -1273,8 +1311,8 @@ int main(int argc, char** argv)
                 // p_imu->push_update_state(LidarMeasures.measures.back().img_offset_time, state);
                 geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
                 euler_cur = RotMtoEuler(state.rot_end);
-                fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-                <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
+                // fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+                // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
             }
             continue;
         }
@@ -1344,11 +1382,11 @@ int main(int argc, char** argv)
             euler_cur = RotMtoEuler(state.rot_end);
             #ifdef USE_IKFOM
             //state_ikfom fout_state = kf.get_x();
-            fout_pre << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
-            <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
+            //  << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
+            // <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<< endl;
             #else
-            fout_pre << setw(20) << LidarMeasures.last_update_time  - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
+            // fout_pre << setw(20) << LidarMeasures.last_update_time  - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<< endl;
             #endif
         }
 
@@ -1641,11 +1679,14 @@ int main(int argc, char** argv)
         // SaveTrajTUM(LidarMeasures.lidar_beg_time, state.rot_end, state.pos_end);
         double t_update_end = omp_get_wtime();
         /******* Publish odometry *******/
+
+        cout << " IMU pos" << state.pos_end <<endl;
         euler_cur = RotMtoEuler(state.rot_end);
         geoQuat = tf::createQuaternionMsgFromRollPitchYaw(euler_cur(0), euler_cur(1), euler_cur(2));
 
         /*** add the feature points to map kdtree ***/
         t3 = omp_get_wtime();
+        map_incremental();
         t5 = omp_get_wtime();
         kdtree_incremental_time = t5 - t3 + readd_time;
         /******* Publish points *******/
@@ -1662,24 +1703,22 @@ int main(int argc, char** argv)
         *pcl_wait_pub = *laserCloudWorld;
         cout << "===================" <<  laserCloudWorld->size() << endl;
         
-        *cloud += *featsFromMap;
+        // *cloud += *featsFromMap;
         PointCloudXYZ::Ptr newLaserCloudWorld(new PointCloudXYZ()); 
         XYZI2XYZ(laserCloudWorld,newLaserCloudWorld);
         cout << "===================" <<  newLaserCloudWorld->size() << endl;
         
         // downSizeXYZ(downSizeInputCloud,newLaserCloudWorld,resolution);
-        Eigen::Matrix4f Trans = gicp(fgicp_mt,newLaserCloudWorld,global_map);
-        rot = Trans2Rot(Trans);
-        cout << "rot:" <<rot <<endl;
-        
-        Eigen::Vector3f ruler = RotMtoEuler(rot);
-        cout << "to euler " << ruler << endl;
-        
+        Eigen::Matrix4d Trans = gicp_test(fgicp_mt,newLaserCloudWorld,global_map);
+        cout << "T" << Trans <<endl;
+        computePose(Trans,pos_flag);
+        pos_flag = false;
+     
+
         publish_frame_world(pubLaserCloudFullRes);
         // publish_visual_world_map(pubVisualCloud);
         publish_path(pubPath);
-        publish_pose(pubPose);
-
+        // publish_Pose(pubPose);
 
         #ifdef DEPLOY2023-02-18 19:48:11.516 | INFO   _time_solve * (frame_num - 1)/frame_num + (solve_time + solve_H_time)/frame_num;
         aver_time_const_H_time = aver_time_const_H_time * (frame_num - 1)/frame_num + solve_time / frame_num;
@@ -1702,11 +1741,11 @@ int main(int argc, char** argv)
         {
             euler_cur = RotMtoEuler(state.rot_end);
             #ifdef USE_IKFOM
-            fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
-            <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<<" "<<feats_undistort->points.size()<<endl;
-            #else
-            fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
-            <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
+            // fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state_point.pos.transpose() << " " << state_point.vel.transpose() \
+            // <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<<" "<<feats_undistort->points.size()<<endl;
+            // #else
+            // fout_out << setw(20) << LidarMeasures.last_update_time - first_lidar_time << " " << euler_cur.transpose()*57.3 << " " << state.pos_end.transpose() << " " << state.vel_end.transpose() \
+            // <<" "<<state.bias_g.transpose()<<" "<<state.bias_a.transpose()<<" "<<state.gravity.transpose()<<" "<<feats_undistort->points.size()<<endl;
             #endif
         }
         // saveGlobalMap();
@@ -1716,35 +1755,36 @@ int main(int argc, char** argv)
 
     #ifndef DEPLOY
     vector<double> t, s_vec, s_vec2, s_vec3, s_vec4, s_vec5, s_vec6, s_vec7;    
-    FILE *fp2;
-    string log_dir = root_dir + "/Log/fast_livo_time_log.csv";
-    fp2 = fopen(log_dir.c_str(),"w");
-    fprintf(fp2,"time_stamp, average time, incremental time, search time,fov check time, total time, alpha_bal, alpha_del\n");
-    for (int i = 0;i<time_log_counter; i++){
-        fprintf(fp2,"%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i],s_plot7[i]);
-        t.push_back(T1[i]);
-        s_vec.push_back(s_plot[i]);
-        s_vec2.push_back(s_plot2[i]);
-        s_vec3.push_back(s_plot3[i]);
-        s_vec4.push_back(s_plot4[i]);
-        s_vec5.push_back(s_plot5[i]);
-        s_vec6.push_back(s_plot6[i]);        
-        s_vec7.push_back(s_plot7[i]);                             
-    }
-    fclose(fp2);
-    if (!t.empty())
-    {
-        // plt::named_plot("incremental time",t,s_vec2);
-        // plt::named_plot("search_time",t,s_vec3);
-        // plt::named_plot("total time",t,s_vec5);
-        // plt::named_plot("average time",t,s_vec);
-        // plt::legend();
-        // plt::show();
-        // plt::pause(0.5);
-        // plt::close();
-    }
-    cout << "no points saved" << endl;
+    // FILE *fp2;
+    // string log_dir = root_dir + "/Log/fast_livo_time_log.csv";
+    // fp2 = fopen(log_dir.c_str(),"w");
+    // fprintf(fp2,"time_stamp, average time, incremental time, search time,fov check time, total time, alpha_bal, alpha_del\n");
+    // for (int i = 0;i<time_log_counter; i++){
+    //     fprintf(fp2,"%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%0.8f,%f,%f\n",T1[i],s_plot[i],s_plot2[i],s_plot3[i],s_plot4[i],s_plot5[i],s_plot6[i],s_plot7[i]);
+    //     t.push_back(T1[i]);
+    //     s_vec.push_back(s_plot[i]);
+    //     s_vec2.push_back(s_plot2[i]);
+    //     s_vec3.push_back(s_plot3[i]);
+    //     s_vec4.push_back(s_plot4[i]);
+    //     s_vec5.push_back(s_plot5[i]);
+    //     s_vec6.push_back(s_plot6[i]);        
+    //     s_vec7.push_back(s_plot7[i]);                             
+    // }
+    // fclose(fp2);
+    // if (!t.empty())
+    // {
+    //     // plt::named_plot("incremental time",t,s_vec2);
+    //     // plt::named_plot("search_time",t,s_vec3);
+    //     // plt::named_plot("total time",t,s_vec5);
+    //     // plt::named_plot("average time",t,s_vec);
+    //     // plt::legend();
+    //     // plt::show();
+    //     // plt::pause(0.5);
+    //     // plt::close();
+    // }
+    // cout << "no points saved" << endl;
     #endif
 
     return 0;
+
 }
